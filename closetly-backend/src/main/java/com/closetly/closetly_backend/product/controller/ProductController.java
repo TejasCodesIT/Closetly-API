@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.Authentication;
+import org.springframework.data.domain.Page;
+import org.springframework.web.bind.annotation.RequestParam;
 import java.util.List;
 
 @RestController
@@ -17,14 +19,14 @@ public class ProductController {
     private final ProductService productService;
 
     @PostMapping
-public ResponseEntity<ProductDTO> create(
-        @Valid @RequestBody ProductRequestDTO request,
-        Authentication authentication) {
+    public ResponseEntity<ProductDTO> create(
+            @Valid @RequestBody ProductRequestDTO request,
+            Authentication authentication) {
 
-    String email = authentication.getName();
+        String email = authentication.getName();
 
-    return ResponseEntity.ok(productService.createProduct(request, email));
-}
+        return ResponseEntity.ok(productService.createProduct(request, email));
+    }
 
     @PutMapping("/{id}")
     public ResponseEntity<ProductDTO> update(@PathVariable Long id, @Valid @RequestBody ProductRequestDTO request) {
@@ -43,7 +45,9 @@ public ResponseEntity<ProductDTO> create(
     }
 
     @GetMapping
-    public ResponseEntity<List<ProductDTO>> list() {
-        return ResponseEntity.ok(productService.listActiveProducts());
+    public ResponseEntity<Page<ProductDTO>> list(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(productService.listActiveProducts(page, size));
     }
 }
