@@ -1,0 +1,68 @@
+package com.closetly.closetly_backend.product.entity;
+
+import com.closetly.closetly_backend.user.entity.User;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.Where;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Data
+@Builder
+@Entity
+@Table(name = "products")
+// @Where(clause = "deleted = false")
+@NoArgsConstructor
+@AllArgsConstructor
+public class Product {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false)
+    private String title;
+
+    @Column(length = 1000)
+    private String description;
+
+    private String brand;
+    private String size;
+    private String productCondition;
+
+    private Double salePrice;
+    private Double rentPricePerDay;
+
+    private boolean isForSale;
+    private boolean isForRent;
+
+    private Integer quantity;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "seller_id", nullable = false)
+    private User seller;
+
+    @Enumerated(EnumType.STRING)
+    private ProductStatus status = ProductStatus.ACTIVE;
+
+    @ElementCollection
+    @CollectionTable(name = "product_images", joinColumns = @JoinColumn(name = "product_id"))
+    @Column(name = "url")
+    private List<String> images;
+
+    @CreationTimestamp
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    private LocalDateTime updatedAt;
+
+    private boolean deleted = false;
+
+    public enum ProductStatus {
+        ACTIVE,
+        INACTIVE,
+        BLOCKED
+    }
+}
