@@ -22,10 +22,10 @@ public class ProductServiceImpl implements ProductService {
     private final UserRepository userRepository;
 
     @Override
-    public ProductDTO createProduct(ProductRequestDTO request) {
-        // seller must exist
-        User seller = userRepository.findById(request.getSellerId())
-                .orElseThrow(() -> new IllegalArgumentException("Seller not found: " + request.getSellerId()));
+    public ProductDTO createProduct(ProductRequestDTO request, String email) {
+
+        User seller = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Seller not found"));
 
         Product product = Product.builder()
                 .title(request.getTitle())
@@ -40,10 +40,11 @@ public class ProductServiceImpl implements ProductService {
                 .quantity(request.getQuantity())
                 .images(request.getImages())
                 .seller(seller)
-                .status(ProductStatus.ACTIVE)
+                .status(Product.ProductStatus.ACTIVE)
                 .build();
 
         Product saved = productRepository.save(product);
+
         return toDto(saved);
     }
 

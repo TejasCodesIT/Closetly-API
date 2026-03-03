@@ -6,7 +6,7 @@ import com.closetly.closetly_backend.product.dto.ProductRequestDTO;
 import java.util.List;
 
 public interface ProductService {
-    ProductDTO createProduct(ProductRequestDTO request);
+    public ProductDTO createProduct(ProductRequestDTO request, String email);
 
     ProductDTO updateProduct(Long id, ProductRequestDTO request);
 

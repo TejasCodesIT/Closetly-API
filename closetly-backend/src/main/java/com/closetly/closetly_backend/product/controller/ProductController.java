@@ -7,7 +7,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
+import org.springframework.security.core.Authentication;
 import java.util.List;
 
 @RestController
@@ -17,9 +17,14 @@ public class ProductController {
     private final ProductService productService;
 
     @PostMapping
-    public ResponseEntity<ProductDTO> create(@Valid @RequestBody ProductRequestDTO request) {
-        return ResponseEntity.ok(productService.createProduct(request));
-    }
+public ResponseEntity<ProductDTO> create(
+        @Valid @RequestBody ProductRequestDTO request,
+        Authentication authentication) {
+
+    String email = authentication.getName();
+
+    return ResponseEntity.ok(productService.createProduct(request, email));
+}
 
     @PutMapping("/{id}")
     public ResponseEntity<ProductDTO> update(@PathVariable Long id, @Valid @RequestBody ProductRequestDTO request) {
