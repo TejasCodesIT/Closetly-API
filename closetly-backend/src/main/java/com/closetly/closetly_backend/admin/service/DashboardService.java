@@ -84,14 +84,15 @@ public class DashboardService {
     private Double getMarketplaceRevenue(LocalDateTime startDate, LocalDateTime endDate) {
 
         String jpql = """
-                SELECT COALESCE(SUM(
-                    (FUNCTION('DATEDIFF', b.endDate, b.startDate)) * p.rentPricePerDay
-                ), 0.0)
-                FROM Booking b
-                JOIN b.product p
-                WHERE b.createdAt >= :startDate
-                  AND b.createdAt <= :endDate
-                  AND b.status IN ('APPROVED', 'COMPLETED')
+                    SELECT COALESCE(SUM(
+                        (CAST(FUNCTION('DATEDIFF', b.endDate, b.startDate) AS long))
+                        * p.rentPricePerDay
+                    ), 0.0)
+                    FROM Booking b
+                    JOIN b.product p
+                    WHERE b.createdAt >= :startDate
+                      AND b.createdAt <= :endDate
+                      AND b.status IN ('APPROVED', 'COMPLETED')
                 """;
 
         Double revenue = entityManager.createQuery(jpql, Double.class)

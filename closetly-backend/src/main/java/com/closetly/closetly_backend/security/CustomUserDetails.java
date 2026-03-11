@@ -2,6 +2,8 @@ package com.closetly.closetly_backend.security;
 
 import com.closetly.closetly_backend.user.entity.User;
 import lombok.AllArgsConstructor;
+
+import org.apache.tomcat.util.http.parser.Authorization;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -16,7 +18,7 @@ public class CustomUserDetails implements UserDetails {
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return user.getRoles().stream()
-                .map(r -> new SimpleGrantedAuthority("ROLE_" + r.getName().name()))
+                .map(r -> new SimpleGrantedAuthority(r.getName().name()))
                 .collect(Collectors.toSet());
     }
 

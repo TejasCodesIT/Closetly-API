@@ -11,5 +11,7 @@ public interface UserService {
     AuthResponse login(LoginRequest request);
 
     UserProfileDTO getProfile(Long userId);
+
+    void assignRole(Long userId, String roleName);
     // additional methods like update, find by id etc
 }

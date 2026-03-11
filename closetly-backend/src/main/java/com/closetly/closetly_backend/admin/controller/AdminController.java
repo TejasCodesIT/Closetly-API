@@ -1,6 +1,7 @@
 package com.closetly.closetly_backend.admin.controller;
 
 import com.closetly.closetly_backend.admin.dto.*;
+import com.closetly.closetly_backend.admin.entity.ReviewFlag;
 import com.closetly.closetly_backend.admin.service.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +12,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -20,7 +23,7 @@ import java.time.format.DateTimeFormatter;
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAuthority('ADMIN')")
 public class AdminController {
 
     private final DashboardService dashboardService;
@@ -38,6 +41,9 @@ public class AdminController {
     @GetMapping("/dashboard")
     public ResponseEntity<DashboardOverviewDTO> getDashboard() {
         DashboardOverviewDTO overview = dashboardService.getOverview();
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        System.out.println("Controller auth: " + auth);
+        System.out.println("Controller authorities:*********************************** " + auth.getAuthorities());
         return ResponseEntity.ok(overview);
     }
 
@@ -108,9 +114,9 @@ public class AdminController {
      * GET /api/admin/reviews?status=flagged
      * Returns flagged reviews with pagination
      */
-    @GetMapping("/reviews")
+    @GetMapping("/review-moderation")
     public ResponseEntity<Page<ReviewModerationDTO>> getFlaggedReviews(
-            @RequestParam(required = false) String status,
+            @RequestParam(required = false) ReviewFlag.FlagStatus status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, size);
