@@ -20,65 +20,68 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ReviewModerationService {
 
-    private final ReviewFlagRepository reviewFlagRepository;
-    private final ReviewRepository reviewRepository;
-    private final UserRepository userRepository;
-    private final SystemLogRepository systemLogRepository;
+        private final ReviewFlagRepository reviewFlagRepository;
+        private final ReviewRepository reviewRepository;
+        private final UserRepository userRepository;
+        private final SystemLogRepository systemLogRepository;
 
-    @Transactional(readOnly = true)
-    public Page<ReviewModerationDTO> getFlaggedReviews(String status, Pageable pageable) {
-        Page<ReviewFlag> flags = status != null && !status.isEmpty()
-                ? reviewFlagRepository.findByStatus(status.toUpperCase(), pageable)
-                : reviewFlagRepository.findFlaggedReviews(pageable);
+        @Transactional(readOnly = true)
+        public Page<ReviewModerationDTO> getFlaggedReviews(
+                        ReviewFlag.FlagStatus status,
+                        Pageable pageable) {
 
-        return flags.map(this::mapToDTO);
-    }
+                Page<ReviewFlag> flags = (status != null)
+                                ? reviewFlagRepository.findByStatus(status, pageable)
+                                : reviewFlagRepository.findFlaggedReviews(pageable);
 
-    @Transactional
-    public void deleteReview(Long reviewId) {
-        Review review = reviewRepository.findById(reviewId)
-                .orElseThrow(() -> new ResourceNotFoundException("Review not found"));
+                return flags.map(this::mapToDTO);
+        }
 
-        review.setDeleted(true);
-        reviewRepository.save(review);
+        @Transactional
+        public void deleteReview(Long reviewId) {
+                Review review = reviewRepository.findById(reviewId)
+                                .orElseThrow(() -> new ResourceNotFoundException("Review not found"));
 
-        logAction(SystemLog.LogType.REVIEW_DELETED,
-                "Review " + reviewId + " deleted by admin.");
-    }
+                review.setDeleted(true);
+                reviewRepository.save(review);
 
-    @Transactional
-    public void banUser(Long userId, String banReason) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+                logAction(SystemLog.LogType.REVIEW_DELETED,
+                                "Review " + reviewId + " deleted by admin.");
+        }
 
-        user.setEnabled(false);
-        userRepository.save(user);
+        @Transactional
+        public void banUser(Long userId, String banReason) {
+                User user = userRepository.findById(userId)
+                                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        logAction(SystemLog.LogType.USER_BANNED,
-                "User " + userId + " (" + user.getEmail() + ") banned. Reason: " + banReason);
-    }
+                user.setEnabled(false);
+                userRepository.save(user);
 
-    private ReviewModerationDTO mapToDTO(ReviewFlag flag) {
-        Review review = flag.getReview();
-        return ReviewModerationDTO.builder()
-                .reviewId(review.getId())
-                .productId(review.getProduct().getId())
-                .productTitle(review.getProduct().getTitle())
-                .reviewerId(review.getReviewer().getId())
-                .reviewerUsername(review.getReviewer().getFullName())
-                .rating(review.getRating())
-                .comment(review.getComment())
-                .flagReason(flag.getReason())
-                .flagStatus(flag.getStatus().toString())
-                .reviewedAt(review.getCreatedAt())
-                .build();
-    }
+                logAction(SystemLog.LogType.USER_BANNED,
+                                "User " + userId + " (" + user.getEmail() + ") banned. Reason: " + banReason);
+        }
 
-    private void logAction(SystemLog.LogType type, String message) {
-        SystemLog log = SystemLog.builder()
-                .type(type)
-                .message(message)
-                .build();
-        systemLogRepository.save(log);
-    }
+        private ReviewModerationDTO mapToDTO(ReviewFlag flag) {
+                Review review = flag.getReview();
+                return ReviewModerationDTO.builder()
+                                .reviewId(review.getId())
+                                .productId(review.getProduct().getId())
+                                .productTitle(review.getProduct().getTitle())
+                                .reviewerId(review.getReviewer().getId())
+                                .reviewerUsername(review.getReviewer().getFullName())
+                                .rating(review.getRating())
+                                .comment(review.getComment())
+                                .flagReason(flag.getReason())
+                                .flagStatus(flag.getStatus().toString())
+                                .reviewedAt(review.getCreatedAt())
+                                .build();
+        }
+
+        private void logAction(SystemLog.LogType type, String message) {
+                SystemLog log = SystemLog.builder()
+                                .type(type)
+                                .message(message)
+                                .build();
+                systemLogRepository.save(log);
+        }
 }

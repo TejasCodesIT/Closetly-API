@@ -22,5 +22,5 @@ public interface ReviewFlagRepository extends JpaRepository<ReviewFlag, Long> {
                 WHERE rf.status = :status
                 ORDER BY rf.flaggedAt DESC
             """)
-    Page<ReviewFlag> findByStatus(String status, Pageable pageable);
+    Page<ReviewFlag> findByStatus(ReviewFlag.FlagStatus status, Pageable pageable);
 }
