@@ -32,6 +32,7 @@ public class UserServiceImpl implements UserService {
         private final AuthenticationManager authenticationManager;
         private final JwtTokenProvider tokenProvider;
         private final RoleRepository roleRepository;
+        private final EmailService emailService;
 
         @Override
         public AuthResponse register(RegistrationRequest request) {
@@ -100,19 +101,31 @@ public class UserServiceImpl implements UserService {
 
         @Override
         public void forgotPassword(ForgotPasswordRequest request) {
-                User user = userRepository.findByEmail(request.getEmail())
-                                .orElseThrow(() -> new IllegalArgumentException(
-                                                "User not found with email: " + request.getEmail()));
+                // Check if user exists, but don't throw exception to avoid email enumeration
+                Optional<User> userOptional = userRepository.findByEmail(request.getEmail());
 
-                // Generate reset token
-                String resetToken = UUID.randomUUID().toString();
-                user.setResetToken(resetToken);
-                user.setResetTokenExpiry(LocalDateTime.now().plusHours(24)); // Token valid for 24 hours
-                userRepository.save(user);
+                if (userOptional.isPresent()) {
+                        User user = userOptional.get();
 
-                // TODO: Send email with reset token
-                // For now, just log the token (in production, send via email service)
-                System.out.println("Password reset token for " + user.getEmail() + ": " + resetToken);
+                        // Generate reset token
+                        String resetToken = UUID.randomUUID().toString();
+                        user.setResetToken(resetToken);
+                        user.setResetTokenExpiry(LocalDateTime.now().plusMinutes(15)); // Token valid for 15 minutes
+                        userRepository.save(user);
+
+                        // Send email with reset token
+                        try {
+                                emailService.sendPasswordResetEmail(user.getEmail(), resetToken);
+                                System.out.println("Password reset email sent successfully to: " + user.getEmail());
+                        } catch (Exception e) {
+                                System.err.println("Failed to send password reset email to " + user.getEmail() + ": "
+                                                + e.getMessage());
+                                throw new RuntimeException("Unable to send email. Please try later.");
+                        }
+                } else {
+                        // User doesn't exist, but we don't reveal this for security
+                        System.out.println("Password reset requested for non-existent email: " + request.getEmail());
+                }
         }
 
         @Override
