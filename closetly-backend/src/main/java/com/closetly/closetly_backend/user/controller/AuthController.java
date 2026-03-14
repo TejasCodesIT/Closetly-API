@@ -4,6 +4,8 @@ import com.closetly.closetly_backend.security.CustomUserDetails;
 import com.closetly.closetly_backend.user.dto.AuthResponse;
 import com.closetly.closetly_backend.user.dto.LoginRequest;
 import com.closetly.closetly_backend.user.dto.RegistrationRequest;
+import com.closetly.closetly_backend.user.dto.ForgotPasswordRequest;
+import com.closetly.closetly_backend.user.dto.ResetPasswordRequest;
 import com.closetly.closetly_backend.user.entity.User;
 import com.closetly.closetly_backend.user.service.UserService;
 import jakarta.validation.Valid;
@@ -53,6 +55,41 @@ public class AuthController {
         response.put("roles", user.getRoles());
 
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        try {
+            userService.forgotPassword(request);
+            return ResponseEntity.ok("Password reset email sent successfully");
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        try {
+            userService.resetPassword(request);
+            return ResponseEntity.ok("Password reset successfully");
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/reset-password")
+    public ResponseEntity<?> showResetPasswordForm(@RequestParam String token) {
+        try {
+            // Validate token exists and is not expired
+            boolean isValid = userService.validateResetToken(token);
+            if (isValid) {
+                return ResponseEntity.ok(Map.of("valid", true, "message", "Token is valid"));
+            } else {
+                return ResponseEntity.badRequest().body(Map.of("valid", false, "message", "Invalid or expired token"));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("valid", false, "message", "Invalid token"));
+        }
     }
 
 }

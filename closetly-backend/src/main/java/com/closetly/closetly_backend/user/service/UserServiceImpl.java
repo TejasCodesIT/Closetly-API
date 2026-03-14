@@ -5,6 +5,8 @@ import com.closetly.closetly_backend.user.dto.AuthResponse;
 import com.closetly.closetly_backend.user.dto.LoginRequest;
 import com.closetly.closetly_backend.user.dto.RegistrationRequest;
 import com.closetly.closetly_backend.user.dto.UserProfileDTO;
+import com.closetly.closetly_backend.user.dto.ForgotPasswordRequest;
+import com.closetly.closetly_backend.user.dto.ResetPasswordRequest;
 import com.closetly.closetly_backend.security.JwtTokenProvider;
 import com.closetly.closetly_backend.user.entity.Role;
 import com.closetly.closetly_backend.user.entity.User;
@@ -18,6 +20,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -92,5 +96,47 @@ public class UserServiceImpl implements UserService {
                                 .orElseThrow(() -> new IllegalArgumentException("Role not found"));
                 user.getRoles().add(role);
                 userRepository.save(user);
+        }
+
+        @Override
+        public void forgotPassword(ForgotPasswordRequest request) {
+                User user = userRepository.findByEmail(request.getEmail())
+                                .orElseThrow(() -> new IllegalArgumentException(
+                                                "User not found with email: " + request.getEmail()));
+
+                // Generate reset token
+                String resetToken = UUID.randomUUID().toString();
+                user.setResetToken(resetToken);
+                user.setResetTokenExpiry(LocalDateTime.now().plusHours(24)); // Token valid for 24 hours
+                userRepository.save(user);
+
+                // TODO: Send email with reset token
+                // For now, just log the token (in production, send via email service)
+                System.out.println("Password reset token for " + user.getEmail() + ": " + resetToken);
+        }
+
+        @Override
+        public void resetPassword(ResetPasswordRequest request) {
+                User user = userRepository.findByResetToken(request.getToken())
+                                .orElseThrow(() -> new IllegalArgumentException("Invalid reset token"));
+
+                if (user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
+                        throw new IllegalArgumentException("Reset token has expired");
+                }
+
+                user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+                user.setResetToken(null);
+                user.setResetTokenExpiry(null);
+                userRepository.save(user);
+        }
+
+        @Override
+        public boolean validateResetToken(String token) {
+                Optional<User> userOptional = userRepository.findByResetToken(token);
+                if (userOptional.isPresent()) {
+                        User user = userOptional.get();
+                        return user.getResetTokenExpiry().isAfter(LocalDateTime.now());
+                }
+                return false;
         }
 }
