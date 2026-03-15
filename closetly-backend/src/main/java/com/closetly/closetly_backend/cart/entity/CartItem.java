@@ -17,7 +17,6 @@ import java.time.LocalDateTime;
 @Builder
 @Entity
 @Table(name = "cart_items")
-@Where(clause = "deleted = false")
 @NoArgsConstructor
 @AllArgsConstructor
 public class CartItem {
@@ -48,8 +47,6 @@ public class CartItem {
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;
-
-    private boolean deleted = false;
 
     public enum CartItemType {
         RENT, BUY;

@@ -12,14 +12,14 @@ import java.util.Optional;
 @Repository
 public interface CartItemRepository extends JpaRepository<CartItem, String> {
 
-    List<CartItem> findByUserIdAndDeletedFalse(Long userId);
+    List<CartItem> findByUserId(Long userId);
 
-    Optional<CartItem> findByIdAndUserIdAndDeletedFalse(String id, Long userId);
+    Optional<CartItem> findByIdAndUserId(String id, Long userId);
 
-    boolean existsByUserIdAndProductIdAndTypeAndDeletedFalse(Long userId, Long productId, CartItem.CartItemType type);
+    boolean existsByUserIdAndProductIdAndType(Long userId, Long productId, CartItem.CartItemType type);
 
-    @Query("SELECT c FROM CartItem c JOIN FETCH c.product p WHERE c.user.id = :userId AND c.deleted = false")
+    @Query("SELECT c FROM CartItem c JOIN FETCH c.product p WHERE c.user.id = :userId")
     List<CartItem> findByUserIdWithProducts(@Param("userId") Long userId);
 
-    void deleteByUserIdAndDeletedFalse(Long userId);
+    void deleteByUserId(Long userId);
 }

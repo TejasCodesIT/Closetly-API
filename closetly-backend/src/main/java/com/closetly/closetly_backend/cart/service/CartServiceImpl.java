@@ -63,7 +63,7 @@ public class CartServiceImpl implements CartService {
         // Check if item already exists in cart (same product, same type)
         CartItem.CartItemType cartItemType = CartItem.CartItemType.valueOf(request.getType().name());
         System.out.println("DEBUG: cartItemType: " + cartItemType);
-        boolean exists = cartItemRepository.existsByUserIdAndProductIdAndTypeAndDeletedFalse(
+        boolean exists = cartItemRepository.existsByUserIdAndProductIdAndType(
                 user.getId(), product.getId(), cartItemType);
 
         if (exists) {
@@ -97,12 +97,10 @@ public class CartServiceImpl implements CartService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        CartItem cartItem = cartItemRepository.findByIdAndUserIdAndDeletedFalse(cartItemId, user.getId())
+        CartItem cartItem = cartItemRepository.findByIdAndUserId(cartItemId, user.getId())
                 .orElseThrow(() -> new IllegalArgumentException("Cart item not found"));
 
-        // Soft delete
-        cartItem.setDeleted(true);
-        cartItemRepository.save(cartItem);
+        cartItemRepository.delete(cartItem);
     }
 
     @Override
@@ -162,7 +160,8 @@ public class CartServiceImpl implements CartService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        cartItemRepository.deleteByUserIdAndDeletedFalse(user.getId());
+        List<CartItem> items = cartItemRepository.findByUserId(user.getId());
+        cartItemRepository.deleteAll(items);
     }
 
     private void validateProductForCart(Product product, AddToCartRequestDTO.CartItemType type) {

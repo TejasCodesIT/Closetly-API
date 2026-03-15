@@ -16,7 +16,6 @@ import java.time.LocalDateTime;
 @Table(name = "wishlists", uniqueConstraints = {
         @UniqueConstraint(columnNames = { "user_id", "product_id" })
 })
-@Where(clause = "deleted = false")
 @NoArgsConstructor
 @AllArgsConstructor
 public class Wishlist {
@@ -37,6 +36,4 @@ public class Wishlist {
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;
-
-    private boolean deleted = false;
 }

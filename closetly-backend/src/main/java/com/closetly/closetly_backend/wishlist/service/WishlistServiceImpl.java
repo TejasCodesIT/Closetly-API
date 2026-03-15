@@ -70,9 +70,7 @@ public class WishlistServiceImpl implements WishlistService {
         Wishlist wishlist = wishlistRepository.findByUserIdAndProductId(user.getId(), productId)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found in wishlist"));
 
-        // Soft delete
-        wishlist.setDeleted(true);
-        wishlistRepository.save(wishlist);
+        wishlistRepository.delete(wishlist);
     }
 
     @Override
