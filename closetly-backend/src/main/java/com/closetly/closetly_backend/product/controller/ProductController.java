@@ -2,6 +2,7 @@ package com.closetly.closetly_backend.product.controller;
 
 import com.closetly.closetly_backend.product.dto.ProductDTO;
 import com.closetly.closetly_backend.product.dto.ProductRequestDTO;
+import com.closetly.closetly_backend.product.dto.ProductSearchResponse;
 import com.closetly.closetly_backend.product.service.ProductService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -9,7 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.data.domain.Page;
-import org.springframework.web.bind.annotation.RequestParam;
+
 import java.util.List;
 
 @RestController
@@ -43,6 +44,36 @@ public class ProductController {
     public ResponseEntity<ProductDTO> get(@PathVariable Long id) {
         return ResponseEntity.ok(productService.getProductById(id));
     }
+
+    @GetMapping("/search")
+public ResponseEntity<ProductSearchResponse> search(
+        @RequestParam(required = false) String query,
+        @RequestParam(required = false) String brand,
+        @RequestParam(required = false) String category,
+        @RequestParam(required = false) String size,
+        @RequestParam(required = false, name = "condition") String condition,
+        @RequestParam(required = false) Double minPrice,
+        @RequestParam(required = false) Double maxPrice,
+        @RequestParam(required = false) String type, // ✅ NEW
+        @RequestParam(required = false, defaultValue = "newest") String sort,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int sizePerPage) {
+
+    var results = productService.searchProducts(
+            query,
+            brand,
+            category,
+            size,
+            condition,
+            minPrice,
+            maxPrice,
+            type,   // ✅ pass this
+            sort,
+            page,
+            sizePerPage);
+
+    return ResponseEntity.ok(ProductSearchResponse.fromPage(results));
+}
 
     @GetMapping
     public ResponseEntity<Page<ProductDTO>> list(

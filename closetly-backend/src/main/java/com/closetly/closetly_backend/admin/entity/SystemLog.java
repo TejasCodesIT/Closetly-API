@@ -9,10 +9,7 @@ import java.time.LocalDateTime;
 @Data
 @Builder
 @Entity
-@Table(name = "system_logs", indexes = {
-        @Index(name = "idx_created_at", columnList = "created_at DESC"),
-        @Index(name = "idx_type", columnList = "type")
-})
+@Table(name = "system_logs")
 @NoArgsConstructor
 @AllArgsConstructor
 public class SystemLog {

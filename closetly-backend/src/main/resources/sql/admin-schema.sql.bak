@@ -27,9 +27,7 @@ CREATE TABLE IF NOT EXISTS system_logs (
               'PRODUCT_BLOCKED', 'USER_BANNED', 'REVIEW_DELETED', 'SYSTEM_ACTION') NOT NULL,
     message VARCHAR(2000) NOT NULL,
     details VARCHAR(5000),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_created_at (created_at DESC),
-    INDEX idx_type (type)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Review Flags table

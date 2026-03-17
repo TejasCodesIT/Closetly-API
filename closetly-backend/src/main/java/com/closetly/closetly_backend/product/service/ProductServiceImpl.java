@@ -5,6 +5,7 @@ import com.closetly.closetly_backend.product.dto.ProductRequestDTO;
 import com.closetly.closetly_backend.product.entity.Product;
 import com.closetly.closetly_backend.product.entity.Product.ProductStatus;
 import com.closetly.closetly_backend.product.repository.ProductRepository;
+import com.closetly.closetly_backend.product.specification.ProductSpecifications;
 import com.closetly.closetly_backend.user.entity.Role;
 import com.closetly.closetly_backend.user.entity.User;
 import com.closetly.closetly_backend.user.repository.UserRepository;
@@ -12,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -37,30 +40,32 @@ public class ProductServiceImpl implements ProductService {
         }
 
         User seller = userRepository.findByEmail(email)
-            .orElseThrow(() -> new IllegalArgumentException("Seller not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Seller not found"));
 
         boolean isUserRole = seller.getRoles().stream()
-            .map(Role::getName)
-            .anyMatch(r -> r == Role.RoleName.USER);
+                .map(Role::getName)
+                .anyMatch(r -> r == Role.RoleName.USER);
         if (!isUserRole) {
             throw new AccessDeniedException("Only users with USER role can create products");
         }
 
         Product product = Product.builder()
-            .title(request.getTitle())
-            .description(request.getDescription())
-            .brand(request.getBrand())
-            .size(request.getSize())
-            .productCondition(request.getCondition())
-            .salePrice(request.getSalePrice())
-            .rentPricePerDay(request.getRentPricePerDay())
-            .isForSale(request.isForSale())
-            .isForRent(request.isForRent())
-            .quantity(request.getQuantity())
-            .images(request.getImages())
-            .seller(seller)
-            .status(Product.ProductStatus.ACTIVE)
-            .build();
+                .title(request.getTitle())
+                .description(request.getDescription())
+                .brand(request.getBrand())
+                .category(request.getCategory())
+                .size(request.getSize())
+                .productCondition(request.getCondition())
+                .salePrice(request.getSalePrice())
+                .rentPricePerDay(request.getRentPricePerDay())
+                .popularity(0)
+                .isForSale(request.isForSale())
+                .isForRent(request.isForRent())
+                .quantity(request.getQuantity())
+                .images(request.getImages())
+                .seller(seller)
+                .status(Product.ProductStatus.ACTIVE)
+                .build();
 
         Product saved = productRepository.save(product);
 
@@ -85,6 +90,7 @@ public class ProductServiceImpl implements ProductService {
         existing.setTitle(request.getTitle());
         existing.setDescription(request.getDescription());
         existing.setBrand(request.getBrand());
+        existing.setCategory(request.getCategory());
         existing.setSize(request.getSize());
         existing.setProductCondition(request.getCondition());
         existing.setSalePrice(request.getSalePrice());
@@ -124,12 +130,84 @@ public class ProductServiceImpl implements ProductService {
         return toDto(product);
     }
 
-    
     @Override
     public Page<ProductDTO> listActiveProducts(int page, int size) {
         var pg = productRepository.findByStatus(ProductStatus.ACTIVE, PageRequest.of(page, size));
         List<ProductDTO> content = pg.getContent().stream().map(this::toDto).collect(Collectors.toList());
         return new PageImpl<>(content, pg.getPageable(), pg.getTotalElements());
+    }
+
+    @Override
+    public Page<ProductDTO> searchProducts(
+            String query,
+            String brand,
+            String category,
+            String size,
+            String condition,
+            Double minPrice,
+            Double maxPrice,
+            String type,
+            String sort,
+            int page,
+            int sizePerPage) {
+        Sort sortObj = toSort(sort);
+        var pageRequest = PageRequest.of(page, sizePerPage, sortObj);
+
+        Specification<Product> spec = Specification
+                .where(ProductSpecifications.isNotDeleted())
+                .and(ProductSpecifications.hasStatus(ProductStatus.ACTIVE));
+                
+        if (type != null && !type.trim().isEmpty()) {
+
+    if (type.equalsIgnoreCase("rent")) {
+        spec = spec.and((root, queryObj, cb) -> cb.isTrue(root.get("isForRent")));
+    } 
+    else if (type.equalsIgnoreCase("buy")) {
+        spec = spec.and((root, queryObj, cb) -> cb.isTrue(root.get("isForSale")));
+    }
+    if (type != null && !type.trim().isEmpty()) {
+    // spec = spec.and(ProductSpecifications.hasType(type));
+    spec = spec.and(ProductSpecifications.hasPriceBetween(minPrice, maxPrice, type)); 
+}
+}
+
+        if (query != null && !query.trim().isEmpty()) {
+            spec = spec.and(ProductSpecifications.hasKeyword(query));
+        }
+        if (brand != null && !brand.trim().isEmpty()) {
+            spec = spec.and(ProductSpecifications.hasBrand(brand));
+        }
+        if (category != null && !category.trim().isEmpty()) {
+            spec = spec.and(ProductSpecifications.hasCategory(category));
+        }
+        if (size != null && !size.trim().isEmpty()) {
+            spec = spec.and(ProductSpecifications.hasSize(size));
+        }
+        if (condition != null && !condition.trim().isEmpty()) {
+            spec = spec.and(ProductSpecifications.hasCondition(condition));
+        }
+        if (minPrice != null || maxPrice != null) {
+            // spec = spec.and(ProductSpecifications.hasPriceBetween(minPrice, maxPrice));
+            spec = spec.and(ProductSpecifications.hasPriceBetween(minPrice, maxPrice, type));
+        }
+
+       
+        var pg = productRepository.findAll(spec, pageRequest);
+        List<ProductDTO> content = pg.getContent().stream().map(this::toDto).collect(Collectors.toList());
+        return new PageImpl<>(content, pg.getPageable(), pg.getTotalElements());
+    }
+
+    private Sort toSort(String sort) {
+        if (sort == null) {
+            return Sort.by(Sort.Direction.DESC, "createdAt");
+        }
+        return switch (sort.toLowerCase().trim()) {
+            case "price-low" -> Sort.by(Sort.Direction.ASC, "salePrice");
+            case "price-high" -> Sort.by(Sort.Direction.DESC, "salePrice");
+            case "popularity" -> Sort.by(Sort.Direction.DESC, "popularity");
+            case "newest" -> Sort.by(Sort.Direction.DESC, "createdAt");
+            default -> Sort.by(Sort.Direction.DESC, "createdAt");
+        };
     }
 
     private ProductDTO toDto(Product p) {
@@ -138,10 +216,12 @@ public class ProductServiceImpl implements ProductService {
         dto.setTitle(p.getTitle());
         dto.setDescription(p.getDescription());
         dto.setBrand(p.getBrand());
+        dto.setCategory(p.getCategory());
         dto.setSize(p.getSize());
         dto.setCondition(p.getProductCondition());
         dto.setSalePrice(p.getSalePrice());
         dto.setRentPricePerDay(p.getRentPricePerDay());
+        dto.setPopularity(p.getPopularity());
         dto.setForSale(p.isForSale());
         dto.setForRent(p.isForRent());
         dto.setQuantity(p.getQuantity());

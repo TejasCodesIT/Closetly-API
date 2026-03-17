@@ -14,4 +14,17 @@ public interface ProductService {
     ProductDTO getProductById(Long id);
 
     Page<ProductDTO> listActiveProducts(int page, int size);
+
+    Page<ProductDTO> searchProducts(
+            String query,
+            String brand,
+            String category,
+            String size,
+            String condition,
+            Double minPrice,
+            Double maxPrice,
+            String type,
+            String sort,
+            int page,
+            int sizePerPage);
 }

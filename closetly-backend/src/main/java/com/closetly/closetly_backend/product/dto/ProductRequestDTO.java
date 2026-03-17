@@ -13,6 +13,7 @@ public class ProductRequestDTO {
 
     private String description;
     private String brand;
+    private String category;
     private String size;
     private String condition;
 

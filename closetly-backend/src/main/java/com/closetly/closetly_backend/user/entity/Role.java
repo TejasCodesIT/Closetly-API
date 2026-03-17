@@ -2,7 +2,7 @@ package com.closetly.closetly_backend.user.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-
+    
 @Data
 @Builder
 @Entity

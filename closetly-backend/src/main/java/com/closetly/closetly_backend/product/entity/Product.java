@@ -1,6 +1,8 @@
 package com.closetly.closetly_backend.product.entity;
 
 import com.closetly.closetly_backend.user.entity.User;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -29,13 +31,18 @@ public class Product {
     private String description;
 
     private String brand;
+    private String category;
     private String size;
     private String productCondition;
 
     private Double salePrice;
     private Double rentPricePerDay;
 
+    private Integer popularity = 0;
+
+    @JsonProperty("isForSale")
     private boolean isForSale;
+    @JsonProperty("isForRent")
     private boolean isForRent;
 
     private Integer quantity;
