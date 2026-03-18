@@ -165,10 +165,10 @@ public class CartServiceImpl implements CartService {
     }
 
     private void validateProductForCart(Product product, AddToCartRequestDTO.CartItemType type) {
-        if (type == AddToCartRequestDTO.CartItemType.RENT && !product.isForRent()) {
+        if (type == AddToCartRequestDTO.CartItemType.RENT && !product.allowsRent()) {
             throw new IllegalArgumentException("Product is not available for rent");
         }
-        if (type == AddToCartRequestDTO.CartItemType.BUY && !product.isForSale()) {
+        if (type == AddToCartRequestDTO.CartItemType.BUY && !product.allowsBuy()) {
             throw new IllegalArgumentException("Product is not available for purchase");
         }
         if (product.getStatus() != Product.ProductStatus.ACTIVE) {

@@ -1,5 +1,6 @@
 package com.closetly.closetly_backend.product.dto;
 
+import com.closetly.closetly_backend.product.entity.ProductType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -19,6 +20,9 @@ public class ProductRequestDTO {
 
     private Double salePrice;
     private Double rentPricePerDay;
+    private Double buyPrice;
+
+    private ProductType productType;
 
     private boolean isForSale;
     private boolean isForRent;

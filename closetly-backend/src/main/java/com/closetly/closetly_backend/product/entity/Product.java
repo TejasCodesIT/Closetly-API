@@ -35,8 +35,12 @@ public class Product {
     private String size;
     private String productCondition;
 
+    @Enumerated(EnumType.STRING)
+    private ProductType productType;
+
     private Double salePrice;
     private Double rentPricePerDay;
+    private Double buyPrice;
 
     private Integer popularity = 0;
 
@@ -66,6 +70,20 @@ public class Product {
     private LocalDateTime updatedAt;
 
     private boolean deleted = false;
+
+    public boolean allowsRent() {
+        if (productType == null) {
+            return isForRent;
+        }
+        return productType == ProductType.RENT || productType == ProductType.BOTH;
+    }
+
+    public boolean allowsBuy() {
+        if (productType == null) {
+            return isForSale;
+        }
+        return productType == ProductType.BUY || productType == ProductType.BOTH;
+    }
 
     public enum ProductStatus {
         ACTIVE,

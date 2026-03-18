@@ -4,6 +4,7 @@ import com.closetly.closetly_backend.product.dto.ProductDTO;
 import com.closetly.closetly_backend.product.dto.ProductRequestDTO;
 import com.closetly.closetly_backend.product.entity.Product;
 import com.closetly.closetly_backend.product.entity.Product.ProductStatus;
+import com.closetly.closetly_backend.product.entity.ProductType;
 import com.closetly.closetly_backend.product.repository.ProductRepository;
 import com.closetly.closetly_backend.product.specification.ProductSpecifications;
 import com.closetly.closetly_backend.user.entity.Role;
@@ -49,6 +50,11 @@ public class ProductServiceImpl implements ProductService {
             throw new AccessDeniedException("Only users with USER role can create products");
         }
 
+        ProductType productType = resolveProductType(request.getProductType(), request.isForRent(), request.isForSale());
+        boolean forRent = productType == ProductType.RENT || productType == ProductType.BOTH;
+        boolean forSale = productType == ProductType.BUY || productType == ProductType.BOTH;
+        Double buyPrice = firstNonNull(request.getBuyPrice(), request.getSalePrice());
+
         Product product = Product.builder()
                 .title(request.getTitle())
                 .description(request.getDescription())
@@ -56,11 +62,13 @@ public class ProductServiceImpl implements ProductService {
                 .category(request.getCategory())
                 .size(request.getSize())
                 .productCondition(request.getCondition())
-                .salePrice(request.getSalePrice())
+                .productType(productType)
+                .salePrice(firstNonNull(request.getSalePrice(), buyPrice))
                 .rentPricePerDay(request.getRentPricePerDay())
+                .buyPrice(buyPrice)
                 .popularity(0)
-                .isForSale(request.isForSale())
-                .isForRent(request.isForRent())
+                .isForSale(forSale)
+                .isForRent(forRent)
                 .quantity(request.getQuantity())
                 .images(request.getImages())
                 .seller(seller)
@@ -93,10 +101,17 @@ public class ProductServiceImpl implements ProductService {
         existing.setCategory(request.getCategory());
         existing.setSize(request.getSize());
         existing.setProductCondition(request.getCondition());
-        existing.setSalePrice(request.getSalePrice());
+        ProductType productType = resolveProductType(request.getProductType(), request.isForRent(), request.isForSale());
+        boolean forRent = productType == ProductType.RENT || productType == ProductType.BOTH;
+        boolean forSale = productType == ProductType.BUY || productType == ProductType.BOTH;
+        Double buyPrice = firstNonNull(request.getBuyPrice(), request.getSalePrice());
+
+        existing.setProductType(productType);
+        existing.setSalePrice(firstNonNull(request.getSalePrice(), buyPrice));
         existing.setRentPricePerDay(request.getRentPricePerDay());
-        existing.setForSale(request.isForSale());
-        existing.setForRent(request.isForRent());
+        existing.setBuyPrice(buyPrice);
+        existing.setForSale(forSale);
+        existing.setForRent(forRent);
         existing.setQuantity(request.getQuantity());
         existing.setImages(request.getImages());
         // do not allow changing seller via update
@@ -219,14 +234,36 @@ public class ProductServiceImpl implements ProductService {
         dto.setCategory(p.getCategory());
         dto.setSize(p.getSize());
         dto.setCondition(p.getProductCondition());
+        dto.setProductType(p.getProductType());
         dto.setSalePrice(p.getSalePrice());
         dto.setRentPricePerDay(p.getRentPricePerDay());
+        dto.setBuyPrice(firstNonNull(p.getBuyPrice(), p.getSalePrice()));
         dto.setPopularity(p.getPopularity());
-        dto.setForSale(p.isForSale());
-        dto.setForRent(p.isForRent());
+        dto.setForSale(p.allowsBuy());
+        dto.setForRent(p.allowsRent());
         dto.setQuantity(p.getQuantity());
         dto.setSellerId(p.getSeller() != null ? p.getSeller().getId() : null);
         dto.setImages(p.getImages());
         return dto;
+    }
+
+    private static ProductType resolveProductType(ProductType explicit, boolean isForRent, boolean isForSale) {
+        if (explicit != null) {
+            return explicit;
+        }
+        if (isForRent && isForSale) {
+            return ProductType.BOTH;
+        }
+        if (isForRent) {
+            return ProductType.RENT;
+        }
+        if (isForSale) {
+            return ProductType.BUY;
+        }
+        return ProductType.RENT;
+    }
+
+    private static <T> T firstNonNull(T a, T b) {
+        return a != null ? a : b;
     }
 }

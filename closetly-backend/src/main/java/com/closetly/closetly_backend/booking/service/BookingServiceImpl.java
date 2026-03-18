@@ -32,12 +32,19 @@ public BookingResponseDTO createBooking(BookingRequestDTO request, String email)
     User customer = userRepository.findByEmail(email)
             .orElseThrow(() -> new IllegalArgumentException("Customer not found"));
 
+    if (!product.allowsRent()) {
+        throw new IllegalArgumentException("Product is not available for rent");
+    }
+
     // Prevent seller booking own product
     if (product.getSeller().getId().equals(customer.getId())) {
         throw new IllegalStateException("You cannot book your own product");
     }
 
     // Validate date logic
+    if (request.getStartDate() == null || request.getEndDate() == null) {
+        throw new IllegalArgumentException("Start date and end date are required for booking");
+    }
     if (request.getStartDate().isAfter(request.getEndDate())) {
         throw new IllegalArgumentException("Start date cannot be after end date");
     }
