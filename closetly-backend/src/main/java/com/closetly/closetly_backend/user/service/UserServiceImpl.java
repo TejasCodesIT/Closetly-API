@@ -4,6 +4,7 @@ import org.springframework.security.core.Authentication;
 import com.closetly.closetly_backend.user.dto.AuthResponse;
 import com.closetly.closetly_backend.user.dto.LoginRequest;
 import com.closetly.closetly_backend.user.dto.RegistrationRequest;
+import com.closetly.closetly_backend.user.dto.UpdateProfileRequestDTO;
 import com.closetly.closetly_backend.user.dto.UserProfileDTO;
 import com.closetly.closetly_backend.user.dto.ForgotPasswordRequest;
 import com.closetly.closetly_backend.user.dto.ResetPasswordRequest;
@@ -19,6 +20,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.time.LocalDateTime;
@@ -41,22 +43,26 @@ public class UserServiceImpl implements UserService {
                 }
                 Role userRole = roleRepository.findByName(Role.RoleName.USER)
                                 .orElseThrow(() -> new IllegalArgumentException("Default role not found"));
+
+                String verificationToken = UUID.randomUUID().toString();
                 User user = User.builder()
                                 .email(request.getEmail())
                                 .password(passwordEncoder.encode(request.getPassword()))
                                 .fullName(request.getFullName())
+                                .profileImageUrl(null)
+                                .phoneNumber(null)
                                 .latitude(request.getLatitude())
                                 .longitude(request.getLongitude())
-                                .enabled(true)
+                                .enabled(false)
+                                .emailVerified(false)
+                                .verificationToken(verificationToken)
                                 .roles(Set.of(userRole))
                                 .build();
-                userRepository.save(user);
-                String access = tokenProvider.generateToken(
-                                authenticationManager.authenticate(
-                                                new UsernamePasswordAuthenticationToken(request.getEmail(),
-                                                                request.getPassword())));
+                user = Objects.requireNonNull(userRepository.save(user));
+
+                emailService.sendEmailVerificationEmail(user.getEmail(), verificationToken);
+
                 AuthResponse resp = new AuthResponse();
-                resp.setAccessToken(access);
                 // refresh token generation could be added later
                 return resp;
         }
@@ -78,7 +84,8 @@ public class UserServiceImpl implements UserService {
 
         @Override
         public UserProfileDTO getProfile(Long userId) {
-                User user = userRepository.findById(userId)
+                Long id = Objects.requireNonNull(userId, "userId is required");
+                User user = userRepository.findById(id)
                                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
                 UserProfileDTO dto = new UserProfileDTO();
                 dto.setId(user.getId());
@@ -91,7 +98,8 @@ public class UserServiceImpl implements UserService {
 
         @Override
         public void assignRole(Long userId, String roleName) {
-                User user = userRepository.findById(userId)
+                Long id = Objects.requireNonNull(userId, "userId is required");
+                User user = userRepository.findById(id)
                                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
                 Role role = roleRepository.findByName(Role.RoleName.valueOf(roleName.toUpperCase()))
                                 .orElseThrow(() -> new IllegalArgumentException("Role not found"));
@@ -151,5 +159,98 @@ public class UserServiceImpl implements UserService {
                         return user.getResetTokenExpiry().isAfter(LocalDateTime.now());
                 }
                 return false;
+        }
+
+        @Override
+        public void verifyEmail(String token) {
+                if (token == null || token.trim().isEmpty()) {
+                        throw new IllegalArgumentException("Verification token is required");
+                }
+                User user = userRepository.findByVerificationToken(token)
+                                .orElseThrow(() -> new IllegalArgumentException("Invalid verification token"));
+                user.setEmailVerified(true);
+                user.setEnabled(true);
+                user.setVerificationToken(null);
+                userRepository.save(user);
+        }
+
+        @Override
+        public UserProfileDTO getProfileByEmail(String email) {
+                if (email == null || email.trim().isEmpty()) {
+                        throw new IllegalArgumentException("Email is required");
+                }
+                User user = userRepository.findByEmail(email)
+                                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                return toProfileDto(user);
+        }
+
+        @Override
+        public UserProfileDTO updateProfile(String email, UpdateProfileRequestDTO request) {
+                if (email == null || email.trim().isEmpty()) {
+                        throw new IllegalArgumentException("Email is required");
+                }
+                User user = userRepository.findByEmail(email)
+                                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+                if (request.getFullName() != null) {
+                        user.setFullName(request.getFullName());
+                }
+                if (request.getPhoneNumber() != null) {
+                        user.setPhoneNumber(request.getPhoneNumber());
+                }
+                if (request.getLatitude() != null) {
+                        user.setLatitude(request.getLatitude());
+                }
+                if (request.getLongitude() != null) {
+                        user.setLongitude(request.getLongitude());
+                }
+
+                user = userRepository.save(user);
+                return toProfileDto(user);
+        }
+
+        @Override
+        public UserProfileDTO updateProfileImage(String email, String profileImageUrl) {
+                if (email == null || email.trim().isEmpty()) {
+                        throw new IllegalArgumentException("Email is required");
+                }
+                User user = userRepository.findByEmail(email)
+                                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                user.setProfileImageUrl(profileImageUrl);
+                user = userRepository.save(user);
+                return toProfileDto(user);
+        }
+
+        @Override
+        public void changePassword(String email, String currentPassword, String newPassword) {
+                if (email == null || email.trim().isEmpty()) {
+                        throw new IllegalArgumentException("Email is required");
+                }
+                if (currentPassword == null || currentPassword.isBlank()) {
+                        throw new IllegalArgumentException("Current password is required");
+                }
+                if (newPassword == null || newPassword.isBlank()) {
+                        throw new IllegalArgumentException("New password is required");
+                }
+                User user = userRepository.findByEmail(email)
+                                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+                if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+                        throw new IllegalArgumentException("Current password is incorrect");
+                }
+                user.setPassword(passwordEncoder.encode(newPassword));
+                userRepository.save(user);
+        }
+
+        private UserProfileDTO toProfileDto(User user) {
+                UserProfileDTO dto = new UserProfileDTO();
+                dto.setId(user.getId());
+                dto.setEmail(user.getEmail());
+                dto.setFullName(user.getFullName());
+                dto.setProfileImageUrl(user.getProfileImageUrl());
+                dto.setPhoneNumber(user.getPhoneNumber());
+                dto.setLatitude(user.getLatitude());
+                dto.setLongitude(user.getLongitude());
+                return dto;
         }
 }

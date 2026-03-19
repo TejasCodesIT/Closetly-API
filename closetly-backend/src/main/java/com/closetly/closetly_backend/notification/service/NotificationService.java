@@ -5,7 +5,7 @@ import com.closetly.closetly_backend.notification.dto.NotificationDTO;
 import java.util.List;
 
 public interface NotificationService {
-    NotificationDTO createNotification(NotificationDTO dto);
+    void notifyUserByEmail(String email, String message);
 
-    List<NotificationDTO> getNotificationsForUser(Long userId);
+    List<NotificationDTO> getMyNotifications(String email);
 }

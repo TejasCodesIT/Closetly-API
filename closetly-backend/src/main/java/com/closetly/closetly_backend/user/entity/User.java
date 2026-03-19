@@ -31,11 +31,21 @@ public class User {
     @Column(nullable = false)
     private String fullName;
 
+    private String profileImageUrl;
+
+    private String phoneNumber;
+
     private Double latitude;
     private Double longitude;
 
     @Column(nullable = false)
     private boolean enabled = true;
+
+    @Column(nullable = false)
+    private boolean emailVerified = false;
+
+    @Column(unique = true)
+    private String verificationToken;
 
     @Column(nullable = false)
     private boolean deleted = false;

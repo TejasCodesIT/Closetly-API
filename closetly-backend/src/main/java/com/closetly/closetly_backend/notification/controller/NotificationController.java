@@ -2,9 +2,9 @@ package com.closetly.closetly_backend.notification.controller;
 
 import com.closetly.closetly_backend.notification.dto.NotificationDTO;
 import com.closetly.closetly_backend.notification.service.NotificationService;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,13 +15,8 @@ import java.util.List;
 public class NotificationController {
     private final NotificationService notificationService;
 
-    @PostMapping
-    public ResponseEntity<NotificationDTO> create(@Valid @RequestBody NotificationDTO dto) {
-        return ResponseEntity.ok(notificationService.createNotification(dto));
-    }
-
-    @GetMapping("/user/{userId}")
-    public ResponseEntity<List<NotificationDTO>> forUser(@PathVariable Long userId) {
-        return ResponseEntity.ok(notificationService.getNotificationsForUser(userId));
+    @GetMapping("/me")
+    public ResponseEntity<List<NotificationDTO>> myNotifications(Authentication authentication) {
+        return ResponseEntity.ok(notificationService.getMyNotifications(authentication.getName()));
     }
 }

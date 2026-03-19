@@ -4,8 +4,6 @@ import com.closetly.closetly_backend.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
-import org.hibernate.annotations.Where;
 
 import java.time.LocalDateTime;
 
@@ -13,7 +11,6 @@ import java.time.LocalDateTime;
 @Builder
 @Entity
 @Table(name = "notifications")
-@Where(clause = "deleted = false")
 @NoArgsConstructor
 @AllArgsConstructor
 public class Notification {
@@ -25,14 +22,16 @@ public class Notification {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    private String content;
-    private boolean seen = false;
+    @Column(length = 2000, nullable = false)
+    private String message;
+
+    @Column(name = "is_read", nullable = false)
+    @Builder.Default
+    private boolean read = false;
 
     @CreationTimestamp
     private LocalDateTime createdAt;
 
-    @UpdateTimestamp
-    private LocalDateTime updatedAt;
-
+    @Builder.Default
     private boolean deleted = false;
 }

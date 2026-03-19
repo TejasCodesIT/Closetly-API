@@ -39,7 +39,8 @@ public class ReviewModerationService {
 
         @Transactional
         public void deleteReview(Long reviewId) {
-                Review review = reviewRepository.findById(reviewId)
+                Long id = java.util.Objects.requireNonNull(reviewId, "reviewId is required");
+                Review review = reviewRepository.findById(id)
                                 .orElseThrow(() -> new ResourceNotFoundException("Review not found"));
 
                 review.setDeleted(true);
@@ -51,7 +52,8 @@ public class ReviewModerationService {
 
         @Transactional
         public void banUser(Long userId, String banReason) {
-                User user = userRepository.findById(userId)
+                Long id = java.util.Objects.requireNonNull(userId, "userId is required");
+                User user = userRepository.findById(id)
                                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
                 user.setEnabled(false);
@@ -82,6 +84,18 @@ public class ReviewModerationService {
                                 .type(type)
                                 .message(message)
                                 .build();
-                systemLogRepository.save(log);
+                systemLogRepository.save(java.util.Objects.requireNonNull(log));
+        }
+
+        @Transactional
+        public void updateReviewFlagStatus(Long reviewFlagId, ReviewFlag.FlagStatus status) {
+                Long id = java.util.Objects.requireNonNull(reviewFlagId, "reviewFlagId is required");
+                ReviewFlag flag = reviewFlagRepository.findById(id)
+                                .orElseThrow(() -> new ResourceNotFoundException("Review flag not found"));
+                flag.setStatus(status);
+                reviewFlagRepository.save(flag);
+
+                logAction(SystemLog.LogType.SYSTEM_ACTION,
+                                "Review flag " + reviewFlagId + " status changed to " + status);
         }
 }

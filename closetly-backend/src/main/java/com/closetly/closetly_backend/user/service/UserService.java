@@ -22,5 +22,15 @@ public interface UserService {
 
     boolean validateResetToken(String token);
 
+    void verifyEmail(String token);
+
+    UserProfileDTO getProfileByEmail(String email);
+
+    UserProfileDTO updateProfile(String email, com.closetly.closetly_backend.user.dto.UpdateProfileRequestDTO request);
+
+    UserProfileDTO updateProfileImage(String email, String profileImageUrl);
+
+    void changePassword(String email, String currentPassword, String newPassword);
+
     // additional methods like update, find by id etc
 }

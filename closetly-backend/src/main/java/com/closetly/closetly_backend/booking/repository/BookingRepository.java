@@ -18,6 +18,10 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     List<Booking> findByProductIdAndStartDateLessThanEqualAndEndDateGreaterThanEqual(Long productId, LocalDate end,
             LocalDate start);
 
+    List<Booking> findByCustomerEmailOrderByCreatedAtDesc(String email);
+
+    List<Booking> findByProductSellerEmailOrderByCreatedAtDesc(String email);
+
     @Query("""
                 SELECT COUNT(b) FROM Booking b
                 WHERE b.createdAt >= :startDate AND b.createdAt <= :endDate

@@ -5,13 +5,17 @@ import com.closetly.closetly_backend.booking.dto.BookingResponseDTO;
 import com.closetly.closetly_backend.booking.entity.Booking;
 import com.closetly.closetly_backend.booking.entity.Booking.BookingStatus;
 import com.closetly.closetly_backend.booking.repository.BookingRepository;
+import com.closetly.closetly_backend.notification.service.NotificationService;
 import com.closetly.closetly_backend.product.entity.Product;
 import com.closetly.closetly_backend.product.repository.ProductRepository;
 import com.closetly.closetly_backend.user.entity.User;
 import com.closetly.closetly_backend.user.repository.UserRepository;
+import com.closetly.closetly_backend.user.service.EmailService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
+import java.util.Objects;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -22,11 +26,14 @@ public class BookingServiceImpl implements BookingService {
     private final BookingRepository bookingRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final EmailService emailService;
+    private final NotificationService notificationService;
 
     @Override
 public BookingResponseDTO createBooking(BookingRequestDTO request, String email) {
 
-    Product product = productRepository.findById(request.getProductId())
+    Long productId = Objects.requireNonNull(request.getProductId(), "productId is required");
+    Product product = productRepository.findById(productId)
             .orElseThrow(() -> new IllegalArgumentException("Product not found"));
 
     User customer = userRepository.findByEmail(email)
@@ -52,7 +59,7 @@ public BookingResponseDTO createBooking(BookingRequestDTO request, String email)
     // Check overlapping approved bookings
     List<Booking> overlapping = bookingRepository
             .findByProductIdAndStartDateLessThanEqualAndEndDateGreaterThanEqual(
-                    request.getProductId(),
+                    productId,
                     request.getEndDate(),
                     request.getStartDate());
 
@@ -72,36 +79,85 @@ public BookingResponseDTO createBooking(BookingRequestDTO request, String email)
             .status(BookingStatus.PENDING)
             .build();
 
-    Booking saved = bookingRepository.save(booking);
+    Booking saved = Objects.requireNonNull(bookingRepository.save(booking));
+
+    // Notify product owner (email + optional in-app notification)
+    String ownerEmail = saved.getProduct().getSeller().getEmail();
+    safeSend(() -> emailService.sendBookingCreatedEmail(
+            ownerEmail,
+            saved.getProduct().getTitle(),
+            customer.getFullName(),
+            saved.getStartDate(),
+            saved.getEndDate(),
+            saved.getMessage()));
+    safeSend(() -> notificationService.notifyUserByEmail(ownerEmail,
+            "New booking request for \"" + saved.getProduct().getTitle() + "\""));
 
     return toDto(saved);
 }
 
     @Override
-    public BookingResponseDTO approveBooking(Long bookingId, Long sellerId) {
-        Booking booking = bookingRepository.findById(bookingId)
+    public BookingResponseDTO approveBooking(Long bookingId, String email) {
+        Long id = Objects.requireNonNull(bookingId, "bookingId is required");
+        Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
-        if (!booking.getProduct().getSeller().getId().equals(sellerId)) {
-            throw new IllegalArgumentException("Seller does not own product");
-        }
+        enforceOwner(booking, email);
         booking.setStatus(BookingStatus.APPROVED);
-        return toDto(bookingRepository.save(booking));
+        Booking saved = bookingRepository.save(booking);
+
+        // Notify customer
+        String customerEmail = saved.getCustomer().getEmail();
+        safeSend(() -> emailService.sendBookingApprovedEmail(
+                customerEmail,
+                saved.getProduct().getTitle(),
+                saved.getStartDate(),
+                saved.getEndDate()));
+        safeSend(() -> notificationService.notifyUserByEmail(customerEmail,
+                "Your booking was approved for \"" + saved.getProduct().getTitle() + "\""));
+
+        return toDto(saved);
     }
 
     @Override
-    public BookingResponseDTO rejectBooking(Long bookingId, Long sellerId) {
-        Booking booking = bookingRepository.findById(bookingId)
+    public BookingResponseDTO rejectBooking(Long bookingId, String email) {
+        Long id = Objects.requireNonNull(bookingId, "bookingId is required");
+        Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
-        if (!booking.getProduct().getSeller().getId().equals(sellerId)) {
-            throw new IllegalArgumentException("Seller does not own product");
-        }
+        enforceOwner(booking, email);
         booking.setStatus(BookingStatus.REJECTED);
-        return toDto(bookingRepository.save(booking));
+        Booking saved = bookingRepository.save(booking);
+
+        // Notify customer
+        String customerEmail = saved.getCustomer().getEmail();
+        safeSend(() -> emailService.sendBookingRejectedEmail(
+                customerEmail,
+                saved.getProduct().getTitle(),
+                saved.getStartDate(),
+                saved.getEndDate()));
+        safeSend(() -> notificationService.notifyUserByEmail(customerEmail,
+                "Your booking was rejected for \"" + saved.getProduct().getTitle() + "\""));
+
+        return toDto(saved);
     }
 
     @Override
     public List<BookingResponseDTO> getBookingsForProduct(Long productId) {
-        return bookingRepository.findByProductIdAndStatus(productId, BookingStatus.PENDING).stream()
+        Long id = Objects.requireNonNull(productId, "productId is required");
+        return bookingRepository.findByProductIdAndStatus(id, BookingStatus.PENDING).stream()
+                .map(this::toDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<BookingResponseDTO> getMyRequests(String email) {
+        return bookingRepository.findByCustomerEmailOrderByCreatedAtDesc(email).stream()
+                .map(this::toDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<BookingResponseDTO> getBookingsOnMyProducts(String email) {
+        return bookingRepository.findByProductSellerEmailOrderByCreatedAtDesc(email).stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
     }
@@ -116,5 +172,21 @@ public BookingResponseDTO createBooking(BookingRequestDTO request, String email)
         dto.setStatus(b.getStatus().name());
         dto.setMessage(b.getMessage());
         return dto;
+    }
+
+    private void enforceOwner(Booking booking, String email) {
+        String ownerEmail = booking.getProduct().getSeller().getEmail();
+        if (email == null || !email.equalsIgnoreCase(ownerEmail)) {
+            throw new AccessDeniedException("Only the product owner can perform this action");
+        }
+    }
+
+    private static void safeSend(Runnable action) {
+        try {
+            action.run();
+        } catch (Exception e) {
+            // Don't block booking state changes if notifications fail
+            System.err.println("Notification/email failed: " + e.getMessage());
+        }
     }
 }

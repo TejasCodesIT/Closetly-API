@@ -31,17 +31,27 @@ public ResponseEntity<BookingResponseDTO> createBooking(
 }
 
     @PostMapping("/{id}/approve")
-    public ResponseEntity<BookingResponseDTO> approve(@PathVariable Long id, @RequestParam Long sellerId) {
-        return ResponseEntity.ok(bookingService.approveBooking(id, sellerId));
+    public ResponseEntity<BookingResponseDTO> approve(@PathVariable Long id, Authentication authentication) {
+        return ResponseEntity.ok(bookingService.approveBooking(id, authentication.getName()));
     }
 
     @PostMapping("/{id}/reject")
-    public ResponseEntity<BookingResponseDTO> reject(@PathVariable Long id, @RequestParam Long sellerId) {
-        return ResponseEntity.ok(bookingService.rejectBooking(id, sellerId));
+    public ResponseEntity<BookingResponseDTO> reject(@PathVariable Long id, Authentication authentication) {
+        return ResponseEntity.ok(bookingService.rejectBooking(id, authentication.getName()));
     }
 
     @GetMapping("/product/{productId}")
     public ResponseEntity<List<BookingResponseDTO>> forProduct(@PathVariable Long productId) {
         return ResponseEntity.ok(bookingService.getBookingsForProduct(productId));
+    }
+
+    @GetMapping("/my-requests")
+    public ResponseEntity<List<BookingResponseDTO>> myRequests(Authentication authentication) {
+        return ResponseEntity.ok(bookingService.getMyRequests(authentication.getName()));
+    }
+
+    @GetMapping("/my-products")
+    public ResponseEntity<List<BookingResponseDTO>> myProducts(Authentication authentication) {
+        return ResponseEntity.ok(bookingService.getBookingsOnMyProducts(authentication.getName()));
     }
 }

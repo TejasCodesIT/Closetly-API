@@ -8,9 +8,13 @@ import java.util.List;
 public interface BookingService {
     BookingResponseDTO createBooking(BookingRequestDTO request, String email);
 
-    BookingResponseDTO approveBooking(Long bookingId, Long sellerId);
+    BookingResponseDTO approveBooking(Long bookingId, String email);
 
-    BookingResponseDTO rejectBooking(Long bookingId, Long sellerId);
+    BookingResponseDTO rejectBooking(Long bookingId, String email);
 
     List<BookingResponseDTO> getBookingsForProduct(Long productId);
+
+    List<BookingResponseDTO> getMyRequests(String email);
+
+    List<BookingResponseDTO> getBookingsOnMyProducts(String email);
 }
