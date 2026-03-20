@@ -56,7 +56,6 @@ public class ChatServiceImpl implements ChatService {
                 .orElseThrow(() -> new IllegalArgumentException("Product not found"));
         Long sellerId = product.getSeller().getId();
 
-        // Security: only the buyer or seller can create/access the room.
         if (!authUserId.equals(buyerId) && !authUserId.equals(sellerId)) {
             throw new AccessDeniedException("You are not a chat participant for this product");
         }
@@ -69,50 +68,28 @@ public class ChatServiceImpl implements ChatService {
                 .findFirstByProductIdAndCustomerIdAndStatusIn(productId, buyerId, PURCHASED_STATUSES)
                 .isPresent();
 
-        // Business rule: room exists only after rent approval or purchase.
         if (!rentApproved && !orderPurchased) {
             throw new IllegalArgumentException(
                     "Chat room can only be created after rent approval or product purchase"
             );
         }
 
-        // Unique room: productId + buyerId.
         Optional<ChatRoom> existing = chatRoomRepository.findByProductIdAndBuyerId(productId, buyerId);
         if (existing.isPresent()) {
-            ChatRoom room = backfillRoomFields(existing.get(), productId, buyerId, sellerId, existing.get().getBooking());
-            return toDto(room);
+            ChatRoom room = existing.get();
+            return toDto(room, authUserId);
         }
 
-        // Rental fallback for legacy/partial data.
-        if (rentApproved) {
-            Booking booking = bookingRepository
-                    .findByProductIdAndCustomerIdAndStatus(productId, buyerId, BookingStatus.APPROVED)
-                    .orElseThrow();
-
-            Optional<ChatRoom> byBooking = chatRoomRepository.findByBookingId(booking.getId());
-            if (byBooking.isPresent()) {
-                ChatRoom room = backfillRoomFields(byBooking.get(), productId, buyerId, sellerId, booking);
-                return toDto(room);
-            }
-
-            ChatRoom created = ChatRoom.builder()
-                    .booking(booking)
-                    .productId(productId)
-                    .buyerId(buyerId)
-                    .sellerId(sellerId)
-                    .build();
-            return toDto(chatRoomRepository.save(created));
-        }
-
-        // Purchase chat room (booking is not required).
         ChatRoom created = ChatRoom.builder()
                 .productId(productId)
                 .buyerId(buyerId)
                 .sellerId(sellerId)
                 .build();
-        return toDto(chatRoomRepository.save(created));
+
+        return toDto(chatRoomRepository.save(created), authUserId);
     }
 
+    // ✅ FIXED METHOD
     @Override
     @Transactional(readOnly = true)
     public List<ChatRoomDTO> getMyRooms(String authEmail) {
@@ -120,8 +97,7 @@ public class ChatServiceImpl implements ChatService {
         Long authUserId = authUser.getId();
 
         return chatRoomRepository.findByBuyerIdOrSellerId(authUserId, authUserId).stream()
-                .map(this::backfillForDtoIfNeeded)
-                .map(this::toDto)
+                .map(room -> toDto(room, authUserId))
                 .collect(Collectors.toList());
     }
 
@@ -130,6 +106,7 @@ public class ChatServiceImpl implements ChatService {
     public List<MessageDTO> getMessages(Long chatRoomId, String authEmail) {
         User authUser = requireAuthUser(authEmail);
         assertUserCanAccessRoom(chatRoomId, authUser.getId());
+
         return messageRepository.findByChatRoomIdWithSender(chatRoomId).stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
@@ -141,11 +118,10 @@ public class ChatServiceImpl implements ChatService {
         User authUser = requireAuthUser(authEmail);
         Long authUserId = authUser.getId();
 
-        // Derive/verify sender from authenticated user.
         if (messageDTO.getSenderId() == null) {
             messageDTO.setSenderId(authUserId);
         } else if (!authUserId.equals(messageDTO.getSenderId())) {
-            throw new AccessDeniedException("Sender does not match authenticated user");
+            throw new AccessDeniedException("Sender mismatch");
         }
 
         assertUserCanAccessRoom(messageDTO.getChatRoomId(), authUserId);
@@ -156,122 +132,98 @@ public class ChatServiceImpl implements ChatService {
                 .chatRoom(room)
                 .sender(authUser)
                 .content(messageDTO.getContent())
-                .isRead(messageDTO.isRead())
+                .isRead(false)
                 .build());
 
         return toDto(saved);
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public void assertUserCanAccessRoom(Long chatRoomId, Long authUserId) {
-        ChatRoom room = requireRoom(chatRoomId);
-        Long buyerId = resolveBuyerId(room);
-        Long sellerId = resolveSellerId(room);
-
-        if (!authUserId.equals(buyerId) && !authUserId.equals(sellerId)) {
-            throw new AccessDeniedException("You are not a participant of this chat room");
-        }
-    }
-
-    private User requireAuthUser(String authEmail) {
-        return userRepository.findByEmail(authEmail)
-                .orElseThrow(() -> new AccessDeniedException("Invalid user"));
-    }
-
-    private ChatRoom requireRoom(Long chatRoomId) {
-        return chatRoomRepository.findById(chatRoomId)
-                .orElseThrow(() -> new ResourceNotFoundException("Chat room not found"));
-    }
-
-    private Long resolveBuyerId(ChatRoom room) {
-        if (room.getBuyerId() != null) {
-            return room.getBuyerId();
-        }
-        if (room.getBooking() != null && room.getBooking().getCustomer() != null) {
-            return room.getBooking().getCustomer().getId();
-        }
-        throw new IllegalStateException("Chat room missing buyerId");
-    }
-
-    private Long resolveSellerId(ChatRoom room) {
-        if (room.getSellerId() != null) {
-            return room.getSellerId();
-        }
-        if (room.getBooking() != null && room.getBooking().getProduct() != null
-                && room.getBooking().getProduct().getSeller() != null) {
-            return room.getBooking().getProduct().getSeller().getId();
-        }
-        throw new IllegalStateException("Chat room missing sellerId");
-    }
-
-    private ChatRoom backfillForDtoIfNeeded(ChatRoom room) {
-        if (room.getBuyerId() != null && room.getSellerId() != null && room.getProductId() != null) {
-            return room;
-        }
-        if (room.getBooking() == null || room.getBooking().getProduct() == null || room.getBooking().getCustomer() == null) {
-            return room;
-        }
-
-        Long productId = room.getBooking().getProduct().getId();
-        Long buyerId = room.getBooking().getCustomer().getId();
-        Long sellerId = room.getBooking().getProduct().getSeller() != null
-                ? room.getBooking().getProduct().getSeller().getId()
-                : null;
-
-        if (buyerId == null || sellerId == null) {
-            return room;
-        }
-        return backfillRoomFields(room, productId, buyerId, sellerId, room.getBooking());
-    }
-
-    private ChatRoom backfillRoomFields(ChatRoom room,
-                                          Long productId,
-                                          Long buyerId,
-                                          Long sellerId,
-                                          Booking bookingOrNull) {
-        boolean changed = false;
-
-        if (room.getProductId() == null && productId != null) {
-            room.setProductId(productId);
-            changed = true;
-        }
-        if (room.getBuyerId() == null && buyerId != null) {
-            room.setBuyerId(buyerId);
-            changed = true;
-        }
-        if (room.getSellerId() == null && sellerId != null) {
-            room.setSellerId(sellerId);
-            changed = true;
-        }
-        if (bookingOrNull != null && room.getBooking() == null) {
-            room.setBooking(bookingOrNull);
-            changed = true;
-        }
-
-        return changed ? chatRoomRepository.save(room) : room;
-    }
-
-    private ChatRoomDTO toDto(ChatRoom room) {
+    // ==============================
+    // 🔥 MAIN DTO LOGIC
+    // ==============================
+    private ChatRoomDTO toDto(ChatRoom room, Long currentUserId) {
         ChatRoomDTO dto = new ChatRoomDTO();
+
         dto.setId(room.getId());
         dto.setProductId(room.getProductId());
         dto.setBuyerId(room.getBuyerId());
         dto.setSellerId(room.getSellerId());
         dto.setCreatedAt(room.getCreatedAt());
+
+        // ✅ OTHER USER
+        Long otherUserId = room.getBuyerId().equals(currentUserId)
+                ? room.getSellerId()
+                : room.getBuyerId();
+
+        User otherUser = userRepository.findById(otherUserId).orElse(null);
+
+        if (otherUser != null) {
+            dto.setName(
+                    otherUser.getFullName() != null
+                            ? otherUser.getFullName()
+                            : otherUser.getEmail()
+            );
+        }
+
+        // ✅ LAST MESSAGE
+        Optional<Message> lastMessageOpt =
+                messageRepository.findTopByChatRoomIdOrderBySentAtDesc(room.getId());
+
+        if (lastMessageOpt.isPresent()) {
+            Message lastMsg = lastMessageOpt.get();
+
+            dto.setLastMessage(lastMsg.getContent());
+            dto.setTime(
+                    lastMsg.getSentAt() != null
+                            ? lastMsg.getSentAt().toString()
+                            : ""
+            );
+        }
+
         return dto;
     }
 
+    // ==============================
+    // HELPERS
+    // ==============================
+    private User requireAuthUser(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new AccessDeniedException("Invalid user"));
+    }
+
+    private ChatRoom requireRoom(Long id) {
+        return chatRoomRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Chat room not found"));
+    }
+
+  @Override
+public void assertUserCanAccessRoom(Long chatRoomId, Long userId) {
+    ChatRoom room = requireRoom(chatRoomId);
+
+    if (!userId.equals(room.getBuyerId()) && !userId.equals(room.getSellerId())) {
+        throw new AccessDeniedException("Not part of this chat");
+    }
+}
+
     private MessageDTO toDto(Message message) {
         MessageDTO dto = new MessageDTO();
+
         dto.setId(message.getId());
         dto.setChatRoomId(message.getChatRoom().getId());
         dto.setSenderId(message.getSender().getId());
-        dto.setSenderName(message.getSender().getFullName() != null ? message.getSender().getFullName()
-                : message.getSender().getEmail());
+        dto.setSenderName(
+                message.getSender().getFullName() != null
+                        ? message.getSender().getFullName()
+                        : message.getSender().getEmail()
+        );
         dto.setContent(message.getContent());
-        dto.setSentAt(message.getSentAt() != null ? message.getSentAt().toString() : null);
+        dto.setSentAt(
+                message.getSentAt() != null
+                        ? message.getSentAt().toString()
+                        : null
+        );
         dto.setRead(message.isRead());
+
         return dto;
-}
+    }
 }

@@ -10,6 +10,9 @@ public class ChatRoomDTO {
     private Long productId;
     private Long buyerId;
     private Long sellerId;
+    private String name;         // 👈 other user name
+    private String lastMessage;  // 👈 preview
+    private String time;         // 👈 last message time
     private LocalDateTime createdAt;
 }
 

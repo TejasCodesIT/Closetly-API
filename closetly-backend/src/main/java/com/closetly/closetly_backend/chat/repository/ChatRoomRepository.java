@@ -1,6 +1,8 @@
 package com.closetly.closetly_backend.chat.repository;
 
 import com.closetly.closetly_backend.chat.entity.ChatRoom;
+import com.closetly.closetly_backend.chat.entity.Message;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -14,4 +16,5 @@ public interface ChatRoomRepository extends JpaRepository<ChatRoom, Long> {
     Optional<ChatRoom> findByProductIdAndBuyerId(Long productId, Long buyerId);
 
     List<ChatRoom> findByBuyerIdOrSellerId(Long buyerId, Long sellerId);
+
 }
