@@ -15,6 +15,9 @@ import java.util.List;
 public interface BookingRepository extends JpaRepository<Booking, Long> {
     List<Booking> findByProductIdAndStatus(Long productId, BookingStatus status);
 
+    java.util.Optional<Booking> findByProductIdAndCustomerIdAndStatus(Long productId, Long customerId,
+            BookingStatus status);
+
     List<Booking> findByProductIdAndStartDateLessThanEqualAndEndDateGreaterThanEqual(Long productId, LocalDate end,
             LocalDate start);
 

@@ -14,7 +14,12 @@ import java.util.List;
 @Data
 @Builder
 @Entity
-@Table(name = "chat_rooms")
+@Table(
+        name = "chat_rooms",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uq_chat_rooms_product_buyer", columnNames = {"product_id", "buyer_id"})
+        }
+)
 @Where(clause = "deleted = false")
 @NoArgsConstructor
 @AllArgsConstructor
@@ -23,11 +28,22 @@ public class ChatRoom {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // Optional: rental chats come from an approved booking; purchase chats don't.
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "booking_id", nullable = false)
+    @JoinColumn(name = "booking_id", nullable = true)
     private Booking booking;
 
+    @Column(name = "product_id")
+    private Long productId;
+
+    @Column(name = "buyer_id")
+    private Long buyerId;
+
+    @Column(name = "seller_id")
+    private Long sellerId;
+
     @OneToMany(mappedBy = "chatRoom", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<Message> messages = new ArrayList<>();
 
     @CreationTimestamp
@@ -36,5 +52,6 @@ public class ChatRoom {
     @UpdateTimestamp
     private LocalDateTime updatedAt;
 
+    @Builder.Default
     private boolean deleted = false;
 }

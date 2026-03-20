@@ -40,6 +40,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/verify").permitAll()
+                        .requestMatchers("/api/chat/**").authenticated()
                         .requestMatchers("/api/users/profile", "/api/users/upload-profile-image", "/api/users/change-password").authenticated()
                         .requestMatchers("/api/notifications/me").authenticated()
                         .requestMatchers("/api/search/history").authenticated()
