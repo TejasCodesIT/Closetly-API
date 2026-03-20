@@ -16,26 +16,43 @@ import java.util.List;
 @RequestMapping("/api/chat")
 @RequiredArgsConstructor
 public class ChatController {
+
     private final ChatService chatService;
 
+    /**
+     * Send a chat message.
+     * The senderId will default to the authenticated user if not provided.
+     */
     @PostMapping("/message")
     public ResponseEntity<MessageDTO> send(@Valid @RequestBody MessageDTO dto, Authentication authentication) {
         return ResponseEntity.ok(chatService.sendMessage(dto, authentication.getName()));
     }
 
+    /**
+     * Create a chat room or return existing.
+     * Handles both booking-based and order-based chat rooms.
+     */
     @PostMapping("/room")
     public ResponseEntity<ChatRoomDTO> createRoom(@Valid @RequestBody CreateChatRoomRequestDTO request,
-            Authentication authentication) {
+                                                  Authentication authentication) {
         return ResponseEntity.ok(chatService.createOrGetRoom(request, authentication.getName()));
     }
 
+    /**
+     * Get all chat rooms for the authenticated user (buyer or seller).
+     */
     @GetMapping("/user")
     public ResponseEntity<List<ChatRoomDTO>> myRooms(Authentication authentication) {
         return ResponseEntity.ok(chatService.getMyRooms(authentication.getName()));
     }
 
+    /**
+     * Get all messages for a specific chat room.
+     * Access is verified by ChatService (must be participant).
+     */
     @GetMapping("/room/{chatRoomId}")
-    public ResponseEntity<List<MessageDTO>> messages(@PathVariable Long chatRoomId, Authentication authentication) {
+    public ResponseEntity<List<MessageDTO>> messages(@PathVariable Long chatRoomId,
+                                                     Authentication authentication) {
         return ResponseEntity.ok(chatService.getMessages(chatRoomId, authentication.getName()));
     }
 }
