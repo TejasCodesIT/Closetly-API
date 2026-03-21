@@ -9,6 +9,7 @@ public class BookingResponseDTO {
     private Long id;
     private Long productId;
     private Long customerId;
+    private Long sellerId;
     private LocalDate startDate;
     private LocalDate endDate;
     private String status;

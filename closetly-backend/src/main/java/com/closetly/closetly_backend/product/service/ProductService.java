@@ -4,6 +4,8 @@ import com.closetly.closetly_backend.product.dto.ProductDTO;
 import com.closetly.closetly_backend.product.dto.ProductRequestDTO;
 import org.springframework.data.domain.Page;
 
+import java.util.List;
+
 public interface ProductService {
     ProductDTO createProduct(ProductRequestDTO request, String email);
 
@@ -14,6 +16,8 @@ public interface ProductService {
     ProductDTO getProductById(Long id);
 
     Page<ProductDTO> listActiveProducts(int page, int size);
+
+    List<ProductDTO> getMyProducts(String email);
 
     Page<ProductDTO> searchProducts(
             String query,

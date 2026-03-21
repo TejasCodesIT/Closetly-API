@@ -16,7 +16,7 @@ public interface UserService {
 
     void assignRole(Long userId, String roleName);
 
-    void forgotPassword(ForgotPasswordRequest request);
+    boolean forgotPassword(ForgotPasswordRequest request);
 
     void resetPassword(ResetPasswordRequest request);
 

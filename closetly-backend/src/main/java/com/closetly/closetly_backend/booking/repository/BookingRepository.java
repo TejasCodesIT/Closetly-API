@@ -13,24 +13,26 @@ import java.util.List;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, Long> {
-    List<Booking> findByProductIdAndStatus(Long productId, BookingStatus status);
+        List<Booking> findByProductIdAndStatus(Long productId, BookingStatus status);
 
-    java.util.Optional<Booking> findByProductIdAndCustomerIdAndStatus(Long productId, Long customerId,
-            BookingStatus status);
+        java.util.Optional<Booking> findByProductIdAndCustomerIdAndStatus(Long productId, Long customerId,
+                        BookingStatus status);
 
-    List<Booking> findByProductIdAndStartDateLessThanEqualAndEndDateGreaterThanEqual(Long productId, LocalDate end,
-            LocalDate start);
+        List<Booking> findByProductIdAndStartDateLessThanEqualAndEndDateGreaterThanEqual(Long productId, LocalDate end,
+                        LocalDate start);
 
-    List<Booking> findByCustomerEmailOrderByCreatedAtDesc(String email);
+        List<Booking> findByCustomerEmailOrderByCreatedAtDesc(String email);
 
-    List<Booking> findByProductSellerEmailOrderByCreatedAtDesc(String email);
+        List<Booking> findByProductSellerEmailOrderByCreatedAtDesc(String email);
 
-    @Query("""
-                SELECT COUNT(b) FROM Booking b
-                WHERE b.createdAt >= :startDate AND b.createdAt <= :endDate
-                AND b.status IN ('APPROVED', 'COMPLETED')
-            """)
-    Long countBookingsByDateRange(
-            @Param("startDate") LocalDateTime startDate,
-            @Param("endDate") LocalDateTime endDate);
+        @Query("""
+                            SELECT COUNT(b) FROM Booking b
+                            WHERE b.createdAt >= :startDate AND b.createdAt <= :endDate
+                            AND b.status IN ('APPROVED', 'COMPLETED')
+                        """)
+        Long countBookingsByDateRange(
+                        @Param("startDate") LocalDateTime startDate,
+                        @Param("endDate") LocalDateTime endDate);
+
+        long countByCreatedAtAfter(LocalDateTime dateTime);
 }

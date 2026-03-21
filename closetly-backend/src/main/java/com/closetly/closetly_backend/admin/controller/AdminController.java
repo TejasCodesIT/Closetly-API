@@ -32,6 +32,7 @@ public class AdminController {
     private final ReviewModerationService reviewModerationService;
     private final SystemLogService systemLogService;
     private final ReportExportService reportExportService;
+    private final AdminService adminService;
 
     // ==================== Dashboard Overview API ====================
 
@@ -41,7 +42,7 @@ public class AdminController {
      */
     @GetMapping("/dashboard")
     public ResponseEntity<DashboardOverviewDTO> getDashboard() {
-        DashboardOverviewDTO overview = dashboardService.getOverview();
+        DashboardOverviewDTO overview = adminService.getDashboardOverview();
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         System.out.println("Controller auth: " + auth);
         System.out.println("Controller authorities:*********************************** " + auth.getAuthorities());
@@ -54,7 +55,7 @@ public class AdminController {
      */
     @GetMapping("/dashboard/overview")
     public ResponseEntity<DashboardOverviewDTO> getDashboardOverview() {
-        DashboardOverviewDTO overview = dashboardService.getOverview();
+        DashboardOverviewDTO overview = adminService.getDashboardOverview();
         return ResponseEntity.ok(overview);
     }
 
@@ -64,7 +65,7 @@ public class AdminController {
      */
     @GetMapping("/summary")
     public ResponseEntity<DashboardOverviewDTO> getSummary() {
-        return ResponseEntity.ok(dashboardService.getOverview());
+        return ResponseEntity.ok(adminService.getDashboardOverview());
     }
 
     // ==================== Reported Products API ====================
@@ -192,13 +193,140 @@ public class AdminController {
         return getSystemLogs(limit);
     }
 
+    // ==================== Users Management API ====================
+
+    /**
+     * GET /api/admin/users
+     * Returns paginated list of all users
+     */
+    @GetMapping("/users")
+    public ResponseEntity<Page<UserDTO>> getAllUsers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<UserDTO> users = adminService.getAllUsers(pageable);
+        return ResponseEntity.ok(users);
+    }
+
+    /**
+     * POST /api/admin/users/{userId}/block
+     * Block a user
+     */
+    @PostMapping("/users/{userId}/block")
+    public ResponseEntity<String> blockUser(@PathVariable Long userId) {
+        adminService.blockUser(userId);
+        return ResponseEntity.ok("User blocked successfully");
+    }
+
+    /**
+     * POST /api/admin/users/{userId}/unblock
+     * Unblock a user
+     */
+    @PostMapping("/users/{userId}/unblock")
+    public ResponseEntity<String> unblockUser(@PathVariable Long userId) {
+        adminService.unblockUser(userId);
+        return ResponseEntity.ok("User unblocked successfully");
+    }
+
+    // ==================== Products Management API ====================
+
+    /**
+     * GET /api/admin/products
+     * Returns paginated list of all products
+     */
+    @GetMapping("/products")
+    public ResponseEntity<Page<ProductDTO>> getAllProducts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<ProductDTO> products = adminService.getAllProducts(pageable);
+        return ResponseEntity.ok(products);
+    }
+
+    /**
+     * PUT /api/admin/products/{productId}/approve
+     * Approve a product
+     */
+    @PutMapping("/products/{productId}/approve")
+    public ResponseEntity<String> approveProduct(@PathVariable Long productId) {
+        adminService.restoreProduct(productId);
+        return ResponseEntity.ok("Product approved successfully");
+    }
+
+    /**
+     * PUT /api/admin/products/{productId}/reject
+     * Reject a product
+     */
+    @PutMapping("/products/{productId}/reject")
+    public ResponseEntity<String> rejectProduct(@PathVariable Long productId) {
+        adminService.deleteProduct(productId);
+        return ResponseEntity.ok("Product rejected successfully");
+    }
+
+    /**
+     * DELETE /api/admin/products/{productId}
+     * Delete a product
+     */
+    @DeleteMapping("/products/{productId}")
+    public ResponseEntity<String> deleteProduct(@PathVariable Long productId) {
+        adminService.deleteProduct(productId);
+        return ResponseEntity.ok("Product deleted successfully");
+    }
+
+    /**
+     * PUT /api/admin/products/{productId}/restore
+     * Restore a deleted product
+     */
+    @PutMapping("/products/{productId}/restore")
+    public ResponseEntity<String> restoreProduct(@PathVariable Long productId) {
+        adminService.restoreProduct(productId);
+        return ResponseEntity.ok("Product restored successfully");
+    }
+
+    // ==================== Bookings Management API ====================
+
+    /**
+     * GET /api/admin/bookings
+     * Returns paginated list of all bookings
+     */
+    @GetMapping("/bookings")
+    public ResponseEntity<Page<BookingDTO>> getAllBookings(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<BookingDTO> bookings = adminService.getAllBookings(pageable);
+        return ResponseEntity.ok(bookings);
+    }
+
+    /**
+     * PUT /api/admin/bookings/{bookingId}/cancel
+     * Cancel a booking
+     */
+    @PutMapping("/bookings/{bookingId}/cancel")
+    public ResponseEntity<String> cancelBooking(@PathVariable Long bookingId) {
+        adminService.cancelBooking(bookingId);
+        return ResponseEntity.ok("Booking cancelled successfully");
+    }
+
+    // ==================== Requests Management API ====================
+
+    /**
+     * GET /api/admin/requests
+     * Returns paginated list of all requests (placeholder - not implemented yet)
+     */
+    @GetMapping("/requests")
+    public ResponseEntity<Page<RequestDTO>> getAllRequests(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        // Placeholder until request functionality is implemented
+        return ResponseEntity.ok(Page.empty());
+    }
+
     // ==================== Export Report API ====================
 
     /**
      * GET /api/admin/reports/export?type=monthly
      * Exports reports to CSV file
-     * 
-     * @param type monthly|yearly|weekly|all
      */
     @GetMapping("/reports/export")
     public ResponseEntity<String> exportReports(
@@ -239,10 +367,13 @@ public class AdminController {
             @RequestParam Product.ProductStatus status) {
         // reuse ReportService's productRepository via a small helper would be better,
         // but for now delegate through reportService where appropriate
-        // Here we directly update via ProductService/Repository if needed; keeping simple:
+        // Here we directly update via ProductService/Repository if needed; keeping
+        // simple:
         // In this codebase, ReportService already manages status changes via reports.
-        // For admin manual override, we can call productRepository via a new service method.
-        // To avoid larger refactor, we treat BLOCKED via a dummy report path is overkill,
+        // For admin manual override, we can call productRepository via a new service
+        // method.
+        // To avoid larger refactor, we treat BLOCKED via a dummy report path is
+        // overkill,
         // so instead update via a minimal inline service (omitted here for brevity).
         return ResponseEntity.status(501).body("Manual product status update not yet wired");
     }

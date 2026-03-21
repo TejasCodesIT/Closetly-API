@@ -19,6 +19,11 @@ import java.util.List;
 public class ProductController {
     private final ProductService productService;
 
+    @GetMapping("/mine")
+    public ResponseEntity<List<ProductDTO>> mine(Authentication authentication) {
+        return ResponseEntity.ok(productService.getMyProducts(authentication.getName()));
+    }
+
     @PostMapping
     public ResponseEntity<ProductDTO> create(
             @Valid @RequestBody ProductRequestDTO request,
@@ -30,7 +35,10 @@ public class ProductController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ProductDTO> update(@PathVariable Long id, @Valid @RequestBody ProductRequestDTO request) {
+    public ResponseEntity<ProductDTO> update(
+            @PathVariable Long id,
+            @Valid @RequestBody ProductRequestDTO request,
+            Authentication authentication) {
         return ResponseEntity.ok(productService.updateProduct(id, request));
     }
 

@@ -2,6 +2,7 @@ package com.closetly.closetly_backend.chat.controller;
 
 import com.closetly.closetly_backend.chat.dto.ChatRoomDTO;
 import com.closetly.closetly_backend.chat.dto.CreateChatRoomRequestDTO;
+import com.closetly.closetly_backend.chat.dto.CreateOrGetChatByBookingRequestDTO;
 import com.closetly.closetly_backend.chat.dto.MessageDTO;
 import com.closetly.closetly_backend.chat.service.ChatService;
 import jakarta.validation.Valid;
@@ -26,6 +27,17 @@ public class ChatController {
     @PostMapping("/message")
     public ResponseEntity<MessageDTO> send(@Valid @RequestBody MessageDTO dto, Authentication authentication) {
         return ResponseEntity.ok(chatService.sendMessage(dto, authentication.getName()));
+    }
+
+    /**
+     * Create or get chat room by booking ID.
+     * Only works for approved bookings. Verifies user is buyer or seller.
+     */
+    @PostMapping("/create-or-get")
+    public ResponseEntity<ChatRoomDTO> createOrGetByBooking(
+            @Valid @RequestBody CreateOrGetChatByBookingRequestDTO request,
+            Authentication authentication) {
+        return ResponseEntity.ok(chatService.createOrGetRoomByBooking(request.getBookingId(), authentication.getName()));
     }
 
     /**

@@ -67,7 +67,7 @@ public BookingResponseDTO createBooking(BookingRequestDTO request, String email)
             .anyMatch(b -> b.getStatus() == BookingStatus.APPROVED);
 
     if (alreadyBooked) {
-        throw new IllegalStateException("Product already booked for selected dates");
+        throw new IllegalStateException("This product is already booked for the selected date.");
     }
 
     Booking booking = Booking.builder()
@@ -167,6 +167,7 @@ public BookingResponseDTO createBooking(BookingRequestDTO request, String email)
         dto.setId(b.getId());
         dto.setProductId(b.getProduct().getId());
         dto.setCustomerId(b.getCustomer().getId());
+        dto.setSellerId(b.getProduct().getSeller() != null ? b.getProduct().getSeller().getId() : null);
         dto.setStartDate(b.getStartDate());
         dto.setEndDate(b.getEndDate());
         dto.setStatus(b.getStatus().name());

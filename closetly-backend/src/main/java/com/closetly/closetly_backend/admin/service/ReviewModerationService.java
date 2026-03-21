@@ -13,6 +13,7 @@ import com.closetly.closetly_backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -66,17 +67,18 @@ public class ReviewModerationService {
         private ReviewModerationDTO mapToDTO(ReviewFlag flag) {
                 Review review = flag.getReview();
                 return ReviewModerationDTO.builder()
-                                .reviewId(review.getId())
-                                .productId(review.getProduct().getId())
-                                .productTitle(review.getProduct().getTitle())
-                                .reviewerId(review.getReviewer().getId())
-                                .reviewerUsername(review.getReviewer().getFullName())
-                                .rating(review.getRating())
-                                .comment(review.getComment())
-                                .flagReason(flag.getReason())
-                                .flagStatus(flag.getStatus().toString())
-                                .reviewedAt(review.getCreatedAt())
-                                .build();
+        .id(flag.getId())
+        .reviewId(review.getId())
+        .productId(review.getProduct().getId())
+        .productTitle(review.getProduct().getTitle())
+        .reviewerName(review.getReviewer().getFullName())
+        .rating(review.getRating())
+        .reviewText(review.getComment())
+        .flagReason(flag.getReason())
+        .reportedFor(List.of(flag.getReason()))
+        .status(flag.getStatus().toString())
+        .flaggedAt(flag.getFlaggedAt())
+        .build();
         }
 
         private void logAction(SystemLog.LogType type, String message) {

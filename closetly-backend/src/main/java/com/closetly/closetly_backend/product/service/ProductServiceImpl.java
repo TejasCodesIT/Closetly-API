@@ -139,6 +139,16 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    public List<ProductDTO> getMyProducts(String email) {
+        User seller = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AccessDeniedException("User not found"));
+        return productRepository.findBySeller_IdOrderByCreatedAtDesc(seller.getId()).stream()
+                .filter(p -> !p.isDeleted())
+                .map(this::toDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public ProductDTO getProductById(Long id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found: " + id));

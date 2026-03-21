@@ -7,13 +7,13 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SystemLogDTO {
+public class RequestDTO {
     private Long id;
-    private LocalDateTime timestamp;
-    private String level;
-    private String module;
-    private String message;
+    private String type;
+    private String description;
     private Long userId;
-    private String action;
+    private String userName;
     private String status;
+    private LocalDateTime createdAt;
+    private LocalDateTime resolvedAt;
 }

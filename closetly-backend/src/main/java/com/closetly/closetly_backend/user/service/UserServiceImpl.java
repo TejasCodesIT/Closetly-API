@@ -39,7 +39,7 @@ public class UserServiceImpl implements UserService {
         @Override
         public AuthResponse register(RegistrationRequest request) {
                 if (userRepository.existsByEmail(request.getEmail())) {
-                        throw new IllegalArgumentException("Email already in use");
+                        throw new IllegalArgumentException("This email is already registered.");
                 }
                 Role userRole = roleRepository.findByName(Role.RoleName.USER)
                                 .orElseThrow(() -> new IllegalArgumentException("Default role not found"));
@@ -108,8 +108,7 @@ public class UserServiceImpl implements UserService {
         }
 
         @Override
-        public void forgotPassword(ForgotPasswordRequest request) {
-                // Check if user exists, but don't throw exception to avoid email enumeration
+        public boolean forgotPassword(ForgotPasswordRequest request) {
                 Optional<User> userOptional = userRepository.findByEmail(request.getEmail());
 
                 if (userOptional.isPresent()) {
@@ -124,16 +123,14 @@ public class UserServiceImpl implements UserService {
                         // Send email with reset token
                         try {
                                 emailService.sendPasswordResetEmail(user.getEmail(), resetToken);
-                                System.out.println("Password reset email sent successfully to: " + user.getEmail());
+                                return true;
                         } catch (Exception e) {
                                 System.err.println("Failed to send password reset email to " + user.getEmail() + ": "
                                                 + e.getMessage());
                                 throw new RuntimeException("Unable to send email. Please try later.");
                         }
-                } else {
-                        // User doesn't exist, but we don't reveal this for security
-                        System.out.println("Password reset requested for non-existent email: " + request.getEmail());
                 }
+                return false;
         }
 
         @Override

@@ -17,9 +17,6 @@ import java.util.Map;
 import org.springframework.security.core.Authentication;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.FieldError;
-import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -74,15 +71,17 @@ public class AuthController {
     @PostMapping("/forgot-password")
     public ResponseEntity<Map<String, String>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         try {
-            userService.forgotPassword(request);
+            boolean sent = userService.forgotPassword(request);
             Map<String, String> response = new HashMap<>();
-            response.put("message", "If the email exists, a reset link has been sent.");
+            if (sent) {
+                response.put("message", "Password reset link has been sent to " + request.getEmail() + ".");
+            } else {
+                response.put("message", "No account found with this email.");
+            }
             return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            // Log the exception for debugging
-            System.err.println("Error in forgot password: " + e.getMessage());
+        } catch (RuntimeException e) {
             Map<String, String> response = new HashMap<>();
-            response.put("message", "Unable to send email. Please try later.");
+            response.put("message", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
@@ -112,17 +111,4 @@ public class AuthController {
         }
     }
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, String>> handleValidationExceptions(MethodArgumentNotValidException ex) {
-        Map<String, String> errors = new HashMap<>();
-        ex.getBindingResult().getAllErrors().forEach((error) -> {
-            String fieldName = ((FieldError) error).getField();
-            String errorMessage = error.getDefaultMessage();
-            errors.put(fieldName, errorMessage);
-        });
-
-        Map<String, String> response = new HashMap<>();
-        response.put("message", "Validation failed: " + errors.toString());
-        return ResponseEntity.badRequest().body(response);
-    }
 }

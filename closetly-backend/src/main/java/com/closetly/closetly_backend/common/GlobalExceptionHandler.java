@@ -3,6 +3,9 @@ package com.closetly.closetly_backend.common;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.InternalAuthenticationServiceException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -39,6 +42,34 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(err);
     }
 
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiError> handleIllegalState(IllegalStateException ex) {
+        ApiError err = new ApiError(HttpStatus.BAD_REQUEST.value(), ex.getMessage(), null, LocalDateTime.now());
+        return ResponseEntity.badRequest().body(err);
+    }
+
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<ApiError> handleBadCredentials(BadCredentialsException ex) {
+        ApiError err = new ApiError(HttpStatus.UNAUTHORIZED.value(), "Incorrect password, please try again.", null, LocalDateTime.now());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(err);
+    }
+
+    @ExceptionHandler(InternalAuthenticationServiceException.class)
+    public ResponseEntity<ApiError> handleInternalAuth(InternalAuthenticationServiceException ex) {
+        String message = "No account found with this email.";
+        if (ex.getCause() instanceof UsernameNotFoundException) {
+            message = "No account found with this email.";
+        }
+        ApiError err = new ApiError(HttpStatus.UNAUTHORIZED.value(), message, null, LocalDateTime.now());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(err);
+    }
+
+    @ExceptionHandler(UsernameNotFoundException.class)
+    public ResponseEntity<ApiError> handleUserNotFound(UsernameNotFoundException ex) {
+        ApiError err = new ApiError(HttpStatus.UNAUTHORIZED.value(), "No account found with this email.", null, LocalDateTime.now());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(err);
+    }
+
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiError> handleNotFound(ResourceNotFoundException ex) {
         ApiError err = new ApiError(HttpStatus.NOT_FOUND.value(), ex.getMessage(), null, LocalDateTime.now());
@@ -53,7 +84,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleAll(Exception ex) {
-        ApiError err = new ApiError(HttpStatus.INTERNAL_SERVER_ERROR.value(), "An internal error occurred", null,
+        ApiError err = new ApiError(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Something went wrong, please try again later.", null,
                 LocalDateTime.now());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
     }

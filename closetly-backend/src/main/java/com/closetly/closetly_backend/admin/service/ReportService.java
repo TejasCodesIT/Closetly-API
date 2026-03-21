@@ -83,19 +83,20 @@ public class ReportService {
                 : null;
 
         return ReportedProductDTO.builder()
-                .reportId(report.getId())
-                .productId(product.getId())
-                .productTitle(product.getTitle())
-                .productImage(productImage)
-                .sellerUsername(product.getSeller().getFullName())
-                .sellerEmail(product.getSeller().getEmail())
-                .reason(report.getReason())
-                .description(report.getDescription())
-                .status(report.getStatus().toString())
-                .reportedAt(report.getReportedAt())
-                .build();
-    }
+        .id(report.getId())
+        .productId(product.getId())
+        .sellerId(product.getSeller() != null ? product.getSeller().getId() : null)
+        .sellerName(product.getSeller() != null ? product.getSeller().getFullName() : null)
+        .productTitle(product.getTitle())
+        .reportCount(1) // or calculate if multiple reports
+        .reportReasons(java.util.List.of(report.getReason()))
+        .status(report.getStatus().toString())
+        .severity("LOW") // or dynamic
+        .reportedAt(report.getReportedAt())
+        .images(productImage != null ? java.util.List.of(productImage) : null)
+        .build();
 
+}
     private void logAction(SystemLog.LogType type, String message) {
         SystemLog log = SystemLog.builder()
                 .type(type)

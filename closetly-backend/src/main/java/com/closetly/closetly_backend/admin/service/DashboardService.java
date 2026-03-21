@@ -48,13 +48,11 @@ public class DashboardService {
 
         return DashboardOverviewDTO.builder()
                 .grossBookings(currentBookings)
-                .grossBookingsGrowth(bookingGrowth)
                 .activeResellers(currentResellers)
-                .resellerGrowth(resellerGrowth)
-                .reportedItems(currentReports)
-                .reportedGrowth(reportGrowth)
-                .marketplaceRevenue(currentRevenue)
-                .revenueGrowth(revenueGrowth)
+                .totalUsers(0L) // ✅ TEMP
+                .pendingReviews(0L)
+                .unresolvedReports(currentReports)
+                .systemHealth(85) // static or calculated
                 .build();
     }
 

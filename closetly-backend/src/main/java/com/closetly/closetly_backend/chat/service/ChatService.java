@@ -7,6 +7,8 @@ import com.closetly.closetly_backend.chat.dto.MessageDTO;
 import java.util.List;
 
 public interface ChatService {
+    ChatRoomDTO createOrGetRoomByBooking(Long bookingId, String authEmail);
+
     ChatRoomDTO createOrGetRoom(CreateChatRoomRequestDTO request, String authEmail);
 
     List<ChatRoomDTO> getMyRooms(String authEmail);

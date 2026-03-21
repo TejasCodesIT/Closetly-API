@@ -8,11 +8,10 @@ import lombok.*;
 @AllArgsConstructor
 public class DashboardOverviewDTO {
     private Long grossBookings;
-    private Double grossBookingsGrowth;
     private Long activeResellers;
-    private Double resellerGrowth;
-    private Long reportedItems;
-    private Double reportedGrowth;
-    private Double marketplaceRevenue;
-    private Double revenueGrowth;
+    private Long totalUsers;
+    private Long pendingReviews;
+    private Long unresolvedReports;
+    private Integer systemHealth;
+    
 }

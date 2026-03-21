@@ -55,6 +55,45 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     @Transactional
+    public ChatRoomDTO createOrGetRoomByBooking(Long bookingId, String authEmail) {
+        User authUser = requireAuthUser(authEmail);
+        Long authUserId = authUser.getId();
+
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+
+        if (booking.getStatus() != BookingStatus.APPROVED)
+            throw new IllegalArgumentException("Chat room can only be created for approved bookings");
+
+        Long productId = booking.getProduct().getId();
+        Long buyerId = booking.getCustomer().getId();
+        Long sellerId = booking.getProduct().getSeller() != null
+                ? booking.getProduct().getSeller().getId()
+                : null;
+
+        if (sellerId == null)
+            throw new IllegalArgumentException("Could not resolve seller from product");
+
+        if (!authUserId.equals(buyerId) && !authUserId.equals(sellerId))
+            throw new AccessDeniedException("You are not a participant of this booking");
+
+        Optional<ChatRoom> existingRoom = chatRoomRepository.findByProductIdAndBuyerId(productId, buyerId);
+        if (existingRoom.isPresent())
+            return toDto(existingRoom.get(), authUserId);
+
+        ChatRoom newRoom = ChatRoom.builder()
+                .booking(booking)
+                .productId(productId)
+                .buyerId(buyerId)
+                .sellerId(sellerId)
+                .build();
+
+        ChatRoom saved = chatRoomRepository.saveAndFlush(newRoom);
+        return toDto(saved, authUserId);
+    }
+
+    @Override
+    @Transactional
     public ChatRoomDTO createOrGetRoom(CreateChatRoomRequestDTO request, String authEmail) {
         User authUser = requireAuthUser(authEmail);
         Long authUserId = authUser.getId();

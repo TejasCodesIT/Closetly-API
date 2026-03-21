@@ -7,6 +7,8 @@ import com.closetly.closetly_backend.admin.entity.SystemLog;
 import com.closetly.closetly_backend.product.entity.Product;
 import com.closetly.closetly_backend.review.entity.Review;
 
+import java.util.List;
+
 /**
  * Mapper utility for converting admin entities to DTOs
  */
@@ -19,42 +21,46 @@ public class AdminMapper {
                 : null;
 
         return ReportedProductDTO.builder()
-                .reportId(report.getId())
+                .id(report.getId())
                 .productId(product.getId())
+                .sellerId(product.getSeller().getId())
+                .sellerName(product.getSeller().getFullName())
                 .productTitle(product.getTitle())
-                .productImage(productImage)
-                .sellerUsername(product.getSeller().getFullName())
-                .sellerEmail(product.getSeller().getEmail())
-                .reason(report.getReason())
-                .description(report.getDescription())
+                .reportCount(1) // Single report
+                .reportReasons(List.of(report.getReason()))
                 .status(report.getStatus().toString())
+                .severity("MEDIUM") // Default severity
                 .reportedAt(report.getReportedAt())
+                .images(product.getImages())
                 .build();
     }
 
     public static ReviewModerationDTO toReviewModerationDTO(ReviewFlag flag) {
         Review review = flag.getReview();
         return ReviewModerationDTO.builder()
+                .id(flag.getId())
                 .reviewId(review.getId())
                 .productId(review.getProduct().getId())
                 .productTitle(review.getProduct().getTitle())
-                .reviewerId(review.getReviewer().getId())
-                .reviewerUsername(review.getReviewer().getFullName())
+                .reviewerName(review.getReviewer().getFullName())
                 .rating(review.getRating())
-                .comment(review.getComment())
+                .reviewText(review.getComment())
                 .flagReason(flag.getReason())
-                .flagStatus(flag.getStatus().toString())
-                .reviewedAt(review.getCreatedAt())
+                .reportedFor(List.of(flag.getReason()))
+                .status(flag.getStatus().toString())
+                .flaggedAt(flag.getFlaggedAt())
                 .build();
     }
 
     public static SystemLogDTO toSystemLogDTO(SystemLog log) {
         return SystemLogDTO.builder()
                 .id(log.getId())
-                .type(log.getType().toString())
+                .timestamp(log.getCreatedAt())
+                .level("INFO") // Default level for admin logs
+                .module("ADMIN")
                 .message(log.getMessage())
-                .details(log.getDetails())
-                .createdAt(log.getCreatedAt())
+                .action(log.getType().toString())
+                .status("COMPLETED")
                 .build();
     }
 
