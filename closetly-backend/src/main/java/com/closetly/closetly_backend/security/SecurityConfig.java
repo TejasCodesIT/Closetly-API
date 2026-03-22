@@ -41,7 +41,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/verify").permitAll()
                         .requestMatchers("/api/chat/**").authenticated()
-                        .requestMatchers("/api/users/profile", "/api/users/upload-profile-image", "/api/users/change-password").authenticated()
+                        .requestMatchers("/api/users/profile", "/api/users/upload-profile-image",
+                                "/api/users/change-password")
+                        .authenticated()
                         .requestMatchers("/api/notifications/me").authenticated()
                         .requestMatchers("/api/search/history").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/search").authenticated()
@@ -70,8 +72,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowCredentials(true);
-        config.addAllowedOrigin("http://localhost:4200");
-        config.addAllowedOrigin("http://localhost:3000");
+        config.addAllowedOriginPattern("*"); // ✅ IMPORTANT
         config.addAllowedHeader("*");
         config.addAllowedMethod("*");
 
