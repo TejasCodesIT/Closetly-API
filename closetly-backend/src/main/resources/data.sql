@@ -3,7 +3,7 @@ INSERT INTO roles (name) VALUES ('USER') ON DUPLICATE KEY UPDATE name = name;
 INSERT INTO roles (name) VALUES ('ADMIN') ON DUPLICATE KEY UPDATE name = name;
 
 -- Insert sample user
-INSERT INTO users (email, password, full_name, phone, created_at, updated_at) VALUES
+INSERT INTO users (email, password, full_name, phone_number, created_at, updated_at) VALUES
 ('test@example.com', '$2a$10$examplehashedpassword', 'Test User', '1234567890', NOW(), NOW())
 ON DUPLICATE KEY UPDATE email = email;
 

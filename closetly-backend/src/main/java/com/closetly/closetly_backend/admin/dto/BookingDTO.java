@@ -12,6 +12,8 @@ public class BookingDTO {
     private Long id;
     private Long productId;
     private String productTitle;
+    private String productBrand;
+    private String productImageUrl;
     private Long buyerId;
     private String buyerName;
     private Long sellerId;

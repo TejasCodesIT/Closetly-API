@@ -295,6 +295,16 @@ public class AdminController {
             @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, size);
         Page<BookingDTO> bookings = adminService.getAllBookings(pageable);
+
+        // DEBUG: Verify data is being sent
+        if (!bookings.isEmpty()) {
+            BookingDTO first = bookings.getContent().get(0);
+            System.out.println("[DEBUG] First booking DTO: id=" + first.getId() +
+                    ", productTitle=" + first.getProductTitle() +
+                    ", productBrand=" + first.getProductBrand() +
+                    ", productImageUrl=" + first.getProductImageUrl());
+        }
+
         return ResponseEntity.ok(bookings);
     }
 

@@ -30,71 +30,71 @@ public class BookingServiceImpl implements BookingService {
     private final NotificationService notificationService;
 
     @Override
-public BookingResponseDTO createBooking(BookingRequestDTO request, String email) {
+    public BookingResponseDTO createBooking(BookingRequestDTO request, String email) {
 
-    Long productId = Objects.requireNonNull(request.getProductId(), "productId is required");
-    Product product = productRepository.findById(productId)
-            .orElseThrow(() -> new IllegalArgumentException("Product not found"));
+        Long productId = Objects.requireNonNull(request.getProductId(), "productId is required");
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new IllegalArgumentException("Product not found"));
 
-    User customer = userRepository.findByEmail(email)
-            .orElseThrow(() -> new IllegalArgumentException("Customer not found"));
+        User customer = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Customer not found"));
 
-    if (!product.allowsRent()) {
-        throw new IllegalArgumentException("Product is not available for rent");
+        if (!product.allowsRent()) {
+            throw new IllegalArgumentException("Product is not available for rent");
+        }
+
+        // Prevent seller booking own product
+        if (product.getSeller().getId().equals(customer.getId())) {
+            throw new IllegalStateException("You cannot book your own product");
+        }
+
+        // Validate date logic
+        if (request.getStartDate() == null || request.getEndDate() == null) {
+            throw new IllegalArgumentException("Start date and end date are required for booking");
+        }
+        if (request.getStartDate().isAfter(request.getEndDate())) {
+            throw new IllegalArgumentException("Start date cannot be after end date");
+        }
+
+        // Check overlapping approved bookings
+        List<Booking> overlapping = bookingRepository
+                .findByProductIdAndStartDateLessThanEqualAndEndDateGreaterThanEqual(
+                        productId,
+                        request.getEndDate(),
+                        request.getStartDate());
+
+        boolean alreadyBooked = overlapping.stream()
+                .anyMatch(b -> b.getStatus() == BookingStatus.APPROVED);
+
+        if (alreadyBooked) {
+            throw new IllegalStateException("This product is already booked for the selected date.");
+        }
+
+        Booking booking = Booking.builder()
+                .product(product)
+                .customer(customer)
+                .startDate(request.getStartDate())
+                .endDate(request.getEndDate())
+                .message(request.getMessage())
+                .status(BookingStatus.PENDING)
+                .build();
+
+        Booking saved = Objects.requireNonNull(bookingRepository.save(booking));
+
+        // Notify product owner (email + optional in-app notification)
+        String ownerEmail = saved.getProduct().getSeller().getEmail();
+        safeSend(() -> emailService.sendBookingCreatedEmail(
+                ownerEmail,
+                saved.getProduct().getTitle(),
+                customer.getFullName(),
+                saved.getStartDate(),
+                saved.getEndDate(),
+                saved.getMessage()));
+        safeSend(() -> notificationService.notifyUserByEmail(ownerEmail,
+                "New booking request for \"" + saved.getProduct().getTitle() + "\""));
+
+        return toDto(saved);
     }
-
-    // Prevent seller booking own product
-    if (product.getSeller().getId().equals(customer.getId())) {
-        throw new IllegalStateException("You cannot book your own product");
-    }
-
-    // Validate date logic
-    if (request.getStartDate() == null || request.getEndDate() == null) {
-        throw new IllegalArgumentException("Start date and end date are required for booking");
-    }
-    if (request.getStartDate().isAfter(request.getEndDate())) {
-        throw new IllegalArgumentException("Start date cannot be after end date");
-    }
-
-    // Check overlapping approved bookings
-    List<Booking> overlapping = bookingRepository
-            .findByProductIdAndStartDateLessThanEqualAndEndDateGreaterThanEqual(
-                    productId,
-                    request.getEndDate(),
-                    request.getStartDate());
-
-    boolean alreadyBooked = overlapping.stream()
-            .anyMatch(b -> b.getStatus() == BookingStatus.APPROVED);
-
-    if (alreadyBooked) {
-        throw new IllegalStateException("This product is already booked for the selected date.");
-    }
-
-    Booking booking = Booking.builder()
-            .product(product)
-            .customer(customer)
-            .startDate(request.getStartDate())
-            .endDate(request.getEndDate())
-            .message(request.getMessage())
-            .status(BookingStatus.PENDING)
-            .build();
-
-    Booking saved = Objects.requireNonNull(bookingRepository.save(booking));
-
-    // Notify product owner (email + optional in-app notification)
-    String ownerEmail = saved.getProduct().getSeller().getEmail();
-    safeSend(() -> emailService.sendBookingCreatedEmail(
-            ownerEmail,
-            saved.getProduct().getTitle(),
-            customer.getFullName(),
-            saved.getStartDate(),
-            saved.getEndDate(),
-            saved.getMessage()));
-    safeSend(() -> notificationService.notifyUserByEmail(ownerEmail,
-            "New booking request for \"" + saved.getProduct().getTitle() + "\""));
-
-    return toDto(saved);
-}
 
     @Override
     public BookingResponseDTO approveBooking(Long bookingId, String email) {
@@ -166,6 +166,16 @@ public BookingResponseDTO createBooking(BookingRequestDTO request, String email)
         BookingResponseDTO dto = new BookingResponseDTO();
         dto.setId(b.getId());
         dto.setProductId(b.getProduct().getId());
+
+        // Set product details
+        dto.setProductTitle(b.getProduct().getTitle());
+        dto.setProductBrand(b.getProduct().getBrand());
+
+        // Set product image (safely handle null/empty images list)
+        if (b.getProduct().getImages() != null && !b.getProduct().getImages().isEmpty()) {
+            dto.setProductImageUrl(b.getProduct().getImages().get(0));
+        }
+
         dto.setCustomerId(b.getCustomer().getId());
         dto.setSellerId(b.getProduct().getSeller() != null ? b.getProduct().getSeller().getId() : null);
         dto.setStartDate(b.getStartDate());

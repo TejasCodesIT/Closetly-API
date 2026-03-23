@@ -3,6 +3,7 @@ package com.closetly.closetly_backend.cart.service;
 import com.closetly.closetly_backend.cart.dto.AddToCartRequestDTO;
 import com.closetly.closetly_backend.cart.dto.CartItemDTO;
 import com.closetly.closetly_backend.cart.dto.CartSummaryDTO;
+import com.closetly.closetly_backend.product.dto.ProductDTO;
 import com.closetly.closetly_backend.cart.entity.CartItem;
 import com.closetly.closetly_backend.cart.repository.CartItemRepository;
 import com.closetly.closetly_backend.product.entity.Product;
@@ -150,6 +151,26 @@ public class CartServiceImpl implements CartService {
 
     @Override
     @Transactional
+    public CartItemDTO updateQuantity(String cartItemId, Integer quantity, String userEmail) {
+        // Verify authenticated user
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || !auth.getName().equals(userEmail)) {
+            throw new AccessDeniedException("Not authenticated as the given user");
+        }
+
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        CartItem cartItem = cartItemRepository.findByIdAndUserId(cartItemId, user.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Cart item not found"));
+
+        cartItem.setQuantity(quantity);
+        CartItem saved = cartItemRepository.save(cartItem);
+        return toDto(saved);
+    }
+
+    @Override
+    @Transactional
     public void clearCart(String userEmail) {
         // Verify authenticated user
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -189,24 +210,39 @@ public class CartServiceImpl implements CartService {
     }
 
     private double calculateItemTotal(CartItemDTO item) {
-        if (item.getType() == CartItemDTO.CartItemType.RENT && item.getProductRentPricePerDay() != null) {
+        if (item.getType() == CartItemDTO.CartItemType.RENT && item.getProduct().getRentPricePerDay() != null) {
             long days = java.time.temporal.ChronoUnit.DAYS.between(item.getStartDate(), item.getEndDate()) + 1;
-            return item.getProductRentPricePerDay() * days * item.getQuantity();
-        } else if (item.getType() == CartItemDTO.CartItemType.BUY && item.getProductSalePrice() != null) {
-            return item.getProductSalePrice() * item.getQuantity();
+            return item.getProduct().getRentPricePerDay() * days * item.getQuantity();
+        } else if (item.getType() == CartItemDTO.CartItemType.BUY && item.getProduct().getSalePrice() != null) {
+            return item.getProduct().getSalePrice() * item.getQuantity();
         }
         return 0.0;
     }
 
     private CartItemDTO toDto(CartItem cartItem) {
+        ProductDTO productDto = new ProductDTO();
+        Product product = cartItem.getProduct();
+        productDto.setId(product.getId());
+        productDto.setTitle(product.getTitle());
+        productDto.setDescription(product.getDescription());
+        productDto.setBrand(product.getBrand());
+        productDto.setCategory(product.getCategory());
+        productDto.setSize(product.getSize());
+        productDto.setCondition(product.getProductCondition());
+        productDto.setProductType(product.getProductType());
+        productDto.setSalePrice(product.getSalePrice());
+        productDto.setRentPricePerDay(product.getRentPricePerDay());
+        productDto.setBuyPrice(product.getBuyPrice());
+        productDto.setPopularity(product.getPopularity());
+        productDto.setForSale(product.allowsBuy());
+        productDto.setForRent(product.allowsRent());
+        productDto.setQuantity(product.getQuantity());
+        productDto.setSellerId(product.getSeller() != null ? product.getSeller().getId() : null);
+        productDto.setImages(product.getImages());
+
         CartItemDTO dto = new CartItemDTO();
         dto.setId(cartItem.getId());
-        dto.setProductId(cartItem.getProduct().getId());
-        dto.setProductTitle(cartItem.getProduct().getTitle());
-        dto.setProductBrand(cartItem.getProduct().getBrand());
-        dto.setProductImages(cartItem.getProduct().getImages());
-        dto.setProductSalePrice(cartItem.getProduct().getSalePrice());
-        dto.setProductRentPricePerDay(cartItem.getProduct().getRentPricePerDay());
+        dto.setProduct(productDto);
         dto.setType(CartItemDTO.CartItemType.valueOf(cartItem.getType().name()));
         dto.setQuantity(cartItem.getQuantity());
         dto.setStartDate(cartItem.getStartDate());

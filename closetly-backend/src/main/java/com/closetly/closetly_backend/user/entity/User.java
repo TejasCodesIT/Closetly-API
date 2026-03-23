@@ -33,6 +33,7 @@ public class User {
 
     private String profileImageUrl;
 
+    @Column(name = "phone_number")
     private String phoneNumber;
 
     private Double latitude;

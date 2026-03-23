@@ -2,7 +2,7 @@ package com.closetly.closetly_backend.cart.controller;
 
 import com.closetly.closetly_backend.cart.dto.AddToCartRequestDTO;
 import com.closetly.closetly_backend.cart.dto.CartItemDTO;
-import com.closetly.closetly_backend.cart.dto.CartSummaryDTO;
+import com.closetly.closetly_backend.cart.dto.UpdateQuantityRequestDTO;
 import com.closetly.closetly_backend.cart.service.CartService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +19,14 @@ public class CartController {
 
     private final CartService cartService;
 
-    @PostMapping("/add")
+    @GetMapping
+    public ResponseEntity<List<CartItemDTO>> getCartItems(Authentication authentication) {
+        String email = authentication.getName();
+        List<CartItemDTO> cartItems = cartService.getCartItems(email);
+        return ResponseEntity.ok(cartItems);
+    }
+
+    @PostMapping
     public ResponseEntity<CartItemDTO> addToCart(
             @Valid @RequestBody AddToCartRequestDTO request,
             Authentication authentication) {
@@ -29,7 +36,7 @@ public class CartController {
         return ResponseEntity.ok(result);
     }
 
-    @DeleteMapping("/remove/{cartItemId}")
+    @DeleteMapping("/{cartItemId}")
     public ResponseEntity<Void> removeFromCart(
             @PathVariable String cartItemId,
             Authentication authentication) {
@@ -39,21 +46,18 @@ public class CartController {
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/items")
-    public ResponseEntity<List<CartItemDTO>> getCartItems(Authentication authentication) {
+    @PutMapping("/{cartItemId}/quantity")
+    public ResponseEntity<CartItemDTO> updateQuantity(
+            @PathVariable String cartItemId,
+            @Valid @RequestBody UpdateQuantityRequestDTO request,
+            Authentication authentication) {
+
         String email = authentication.getName();
-        List<CartItemDTO> cartItems = cartService.getCartItems(email);
-        return ResponseEntity.ok(cartItems);
+        CartItemDTO result = cartService.updateQuantity(cartItemId, request.getQuantity(), email);
+        return ResponseEntity.ok(result);
     }
 
-    @GetMapping("/summary")
-    public ResponseEntity<CartSummaryDTO> getCartSummary(Authentication authentication) {
-        String email = authentication.getName();
-        CartSummaryDTO summary = cartService.getCartSummary(email);
-        return ResponseEntity.ok(summary);
-    }
-
-    @DeleteMapping("/clear")
+    @DeleteMapping
     public ResponseEntity<Void> clearCart(Authentication authentication) {
         String email = authentication.getName();
         cartService.clearCart(email);

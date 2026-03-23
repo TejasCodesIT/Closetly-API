@@ -1,7 +1,6 @@
 package com.closetly.closetly_backend.admin.service;
 
 import com.closetly.closetly_backend.admin.dto.*;
-import com.closetly.closetly_backend.admin.entity.Report;
 import com.closetly.closetly_backend.admin.entity.SystemLog;
 import com.closetly.closetly_backend.admin.repository.ReportRepository;
 import com.closetly.closetly_backend.admin.repository.SystemLogRepository;
@@ -18,9 +17,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -33,21 +29,25 @@ public class AdminService {
     private final SystemLogRepository systemLogRepository;
 
     @Transactional(readOnly = true)
+    @SuppressWarnings("null")
     public Page<UserDTO> getAllUsers(Pageable pageable) {
         return userRepository.findAll(pageable).map(this::mapToUserDTO);
     }
 
     @Transactional(readOnly = true)
+    @SuppressWarnings("null")
     public Page<ProductDTO> getAllProducts(Pageable pageable) {
         return productRepository.findAll(pageable).map(this::mapToProductDTO);
     }
 
     @Transactional(readOnly = true)
+    @SuppressWarnings("null")
     public Page<BookingDTO> getAllBookings(Pageable pageable) {
         return bookingRepository.findAll(pageable).map(this::mapToBookingDTO);
     }
 
     @Transactional
+    @SuppressWarnings("null")
     public void blockUser(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -57,6 +57,7 @@ public class AdminService {
     }
 
     @Transactional
+    @SuppressWarnings("null")
     public void unblockUser(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -66,6 +67,7 @@ public class AdminService {
     }
 
     @Transactional
+    @SuppressWarnings("null")
     public void deleteProduct(Long productId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
@@ -75,6 +77,7 @@ public class AdminService {
     }
 
     @Transactional
+    @SuppressWarnings("null")
     public void restoreProduct(Long productId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
@@ -84,6 +87,7 @@ public class AdminService {
     }
 
     @Transactional
+    @SuppressWarnings("null")
     public void cancelBooking(Long bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking not found"));
@@ -140,23 +144,39 @@ public class AdminService {
     }
 
     private BookingDTO mapToBookingDTO(Booking booking) {
+        // Calculate total price for rentals: rentPricePerDay * number of days
+        BigDecimal totalPrice = null;
+        if (booking.getProduct().getRentPricePerDay() != null && booking.getStartDate() != null
+                && booking.getEndDate() != null) {
+            long days = java.time.temporal.ChronoUnit.DAYS.between(booking.getStartDate(), booking.getEndDate()) + 1; // inclusive
+            totalPrice = BigDecimal.valueOf(booking.getProduct().getRentPricePerDay() * days);
+        }
+
         return BookingDTO.builder()
                 .id(booking.getId())
-                .buyerId(booking.getCustomer().getId())
-                .buyerName(booking.getCustomer().getFullName())
                 .productId(booking.getProduct().getId())
                 .productTitle(booking.getProduct().getTitle())
-                .totalPrice(BigDecimal.ZERO) // Placeholder until price calculation is implemented
-                .status(booking.getStatus().toString())
-                .createdAt(booking.getCreatedAt())
+                .productBrand(booking.getProduct().getBrand())
+                .productImageUrl(
+                        booking.getProduct().getImages() != null && !booking.getProduct().getImages().isEmpty()
+                                ? booking.getProduct().getImages().get(0)
+                                : null)
+                .buyerId(booking.getCustomer().getId())
+                .buyerName(booking.getCustomer().getFullName())
+                .sellerId(booking.getProduct().getSeller().getId())
+                .sellerName(booking.getProduct().getSeller().getFullName())
                 .startDate(booking.getStartDate() != null ? booking.getStartDate().atStartOfDay() : null)
                 .endDate(booking.getEndDate() != null ? booking.getEndDate().atStartOfDay() : null)
+                .totalPrice(totalPrice)
+                .status(booking.getStatus().name())
+                .createdAt(booking.getCreatedAt())
                 .build();
     }
 
-    private void logAction(SystemLog.LogType type, String message) {
+    @SuppressWarnings("null")
+    private void logAction(SystemLog.LogType logType, String message) {
         SystemLog log = SystemLog.builder()
-                .type(type)
+                .type(logType)
                 .message(message)
                 .build();
         systemLogRepository.save(log);

@@ -15,5 +15,7 @@ public interface CartService {
 
     CartSummaryDTO getCartSummary(String userEmail);
 
+    CartItemDTO updateQuantity(String cartItemId, Integer quantity, String userEmail);
+
     void clearCart(String userEmail);
 }

@@ -2,6 +2,9 @@ package com.closetly.closetly_backend.booking.repository;
 
 import com.closetly.closetly_backend.booking.entity.Booking;
 import com.closetly.closetly_backend.booking.entity.Booking.BookingStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,7 +16,17 @@ import java.util.List;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, Long> {
-        List<Booking> findByProductIdAndStatus(Long productId, BookingStatus status);
+        @EntityGraph(attributePaths = { "product", "product.images", "product.seller", "customer" })
+        Page<Booking> findAll(Pageable pageable);
+
+        @Query("""
+                        SELECT b FROM Booking b
+                        JOIN FETCH b.product p
+                        LEFT JOIN FETCH p.images
+                        WHERE b.product.id = :productId AND b.status = :status
+                        """)
+        List<Booking> findByProductIdAndStatus(@Param("productId") Long productId,
+                        @Param("status") BookingStatus status);
 
         java.util.Optional<Booking> findByProductIdAndCustomerIdAndStatus(Long productId, Long customerId,
                         BookingStatus status);
@@ -21,9 +34,23 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         List<Booking> findByProductIdAndStartDateLessThanEqualAndEndDateGreaterThanEqual(Long productId, LocalDate end,
                         LocalDate start);
 
-        List<Booking> findByCustomerEmailOrderByCreatedAtDesc(String email);
+        @Query("""
+                        SELECT b FROM Booking b
+                        JOIN FETCH b.product p
+                        LEFT JOIN FETCH p.images
+                        WHERE b.customer.email = :email
+                        ORDER BY b.createdAt DESC
+                        """)
+        List<Booking> findByCustomerEmailOrderByCreatedAtDesc(@Param("email") String email);
 
-        List<Booking> findByProductSellerEmailOrderByCreatedAtDesc(String email);
+        @Query("""
+                        SELECT b FROM Booking b
+                        JOIN FETCH b.product p
+                        LEFT JOIN FETCH p.images
+                        WHERE p.seller.email = :email
+                        ORDER BY b.createdAt DESC
+                        """)
+        List<Booking> findByProductSellerEmailOrderByCreatedAtDesc(@Param("email") String email);
 
         @Query("""
                             SELECT COUNT(b) FROM Booking b
