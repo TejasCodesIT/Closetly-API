@@ -11,6 +11,7 @@ import com.closetly.closetly_backend.user.entity.Role;
 import com.closetly.closetly_backend.user.entity.User;
 import com.closetly.closetly_backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -22,11 +23,12 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
+@SuppressWarnings("null")
 public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
@@ -34,9 +36,26 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public ProductDTO createProduct(ProductRequestDTO request, String email) {
+        log.info("[Product Creation] Starting product creation for user: {}", email);
+        log.debug("[Product Creation] Incoming request - title: {}, category: {}, brand: {}",
+                request.getTitle(), request.getCategory(), request.getBrand());
+
+        // ✅ Log the DTO values immediately after deserialization
+        log.info("[Product Creation] DTO DESERIALIZED - isForSale: {}, isForRent: {}",
+                request.isForSale(), request.isForRent());
+        log.info("[Product Creation] DTO DESERIALIZED - productType: {}, salePrice: {}, rentPricePerDay: {}",
+                request.getProductType(), request.getSalePrice(), request.getRentPricePerDay());
+        log.info("[Product Creation] DTO DESERIALIZED - description: '{}' (length: {})",
+                request.getDescription(),
+                request.getDescription() != null ? request.getDescription().length() : 0);
+
+        request.validate();
+        log.info("[Product Creation] Validation passed");
+
         // verify authenticated user matches email and has USER role
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated() || !auth.getName().equals(email)) {
+            log.error("[Product Creation] Authentication failed for email: {}", email);
             throw new AccessDeniedException("Not authenticated as the given seller");
         }
 
@@ -47,13 +66,25 @@ public class ProductServiceImpl implements ProductService {
                 .map(Role::getName)
                 .anyMatch(r -> r == Role.RoleName.USER);
         if (!isUserRole) {
+            log.error("[Product Creation] User {} does not have USER role", email);
             throw new AccessDeniedException("Only users with USER role can create products");
         }
 
-        ProductType productType = resolveProductType(request.getProductType(), request.isForRent(), request.isForSale());
+        log.debug("[Product Creation] Request details - productType: {}, isForSale: {}, isForRent: {}",
+                request.getProductType(), request.isForSale(), request.isForRent());
+        log.debug("[Product Creation] Request pricing - salePrice: {}, rentPricePerDay: {}",
+                request.getSalePrice(), request.getRentPricePerDay());
+        log.debug("[Product Creation] Request images count: {}",
+                request.getImages() != null ? request.getImages().size() : 0);
+
+        ProductType productType = resolveProductType(request.getProductType(), request.isForRent(),
+                request.isForSale());
         boolean forRent = productType == ProductType.RENT || productType == ProductType.BOTH;
         boolean forSale = productType == ProductType.BUY || productType == ProductType.BOTH;
         Double buyPrice = firstNonNull(request.getBuyPrice(), request.getSalePrice());
+
+        log.info("[Product Creation] Resolved productType: {}, forRent: {}, forSale: {}",
+                productType, forRent, forSale);
 
         Product product = Product.builder()
                 .title(request.getTitle())
@@ -75,16 +106,29 @@ public class ProductServiceImpl implements ProductService {
                 .status(Product.ProductStatus.ACTIVE)
                 .build();
 
+        log.debug("[Product Creation] Entity before save - title: {}, description: '{}' (length: {})",
+                product.getTitle(),
+                product.getDescription(),
+                product.getDescription() != null ? product.getDescription().length() : 0);
+
         Product saved = productRepository.save(product);
+
+        log.info("[Product Creation] Product saved successfully - id: {}, title: {}",
+                saved.getId(), saved.getTitle());
+        log.info("[Product Creation] Saved entity description: '{}' (length: {})",
+                saved.getDescription(),
+                saved.getDescription() != null ? saved.getDescription().length() : 0);
 
         return toDto(saved);
     }
 
     @Override
     public ProductDTO updateProduct(Long id, ProductRequestDTO request) {
+        log.info("[Product Update] Starting product update for product id: {}", id);
+
         Product existing = productRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found: " + id));
-        // ownership check - only seller can update
+
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated()) {
             throw new AccessDeniedException("Not authenticated");
@@ -101,7 +145,8 @@ public class ProductServiceImpl implements ProductService {
         existing.setCategory(request.getCategory());
         existing.setSize(request.getSize());
         existing.setProductCondition(request.getCondition());
-        ProductType productType = resolveProductType(request.getProductType(), request.isForRent(), request.isForSale());
+        ProductType productType = resolveProductType(request.getProductType(), request.isForRent(),
+                request.isForSale());
         boolean forRent = productType == ProductType.RENT || productType == ProductType.BOTH;
         boolean forSale = productType == ProductType.BUY || productType == ProductType.BOTH;
         Double buyPrice = firstNonNull(request.getBuyPrice(), request.getSalePrice());
@@ -114,9 +159,10 @@ public class ProductServiceImpl implements ProductService {
         existing.setForRent(forRent);
         existing.setQuantity(request.getQuantity());
         existing.setImages(request.getImages());
-        // do not allow changing seller via update
 
         Product updated = productRepository.save(existing);
+        log.info("[Product Update] Product updated successfully - id: {}, title: {}", updated.getId(),
+                updated.getTitle());
         return toDto(updated);
     }
 
@@ -181,20 +227,19 @@ public class ProductServiceImpl implements ProductService {
         Specification<Product> spec = Specification
                 .where(ProductSpecifications.isNotDeleted())
                 .and(ProductSpecifications.hasStatus(ProductStatus.ACTIVE));
-                
+
         if (type != null && !type.trim().isEmpty()) {
 
-    if (type.equalsIgnoreCase("rent")) {
-        spec = spec.and((root, queryObj, cb) -> cb.isTrue(root.get("isForRent")));
-    } 
-    else if (type.equalsIgnoreCase("buy")) {
-        spec = spec.and((root, queryObj, cb) -> cb.isTrue(root.get("isForSale")));
-    }
-    if (type != null && !type.trim().isEmpty()) {
-    // spec = spec.and(ProductSpecifications.hasType(type));
-    spec = spec.and(ProductSpecifications.hasPriceBetween(minPrice, maxPrice, type)); 
-}
-}
+            if (type.equalsIgnoreCase("rent")) {
+                spec = spec.and((root, queryObj, cb) -> cb.isTrue(root.get("isForRent")));
+            } else if (type.equalsIgnoreCase("buy")) {
+                spec = spec.and((root, queryObj, cb) -> cb.isTrue(root.get("isForSale")));
+            }
+            if (type != null && !type.trim().isEmpty()) {
+                // spec = spec.and(ProductSpecifications.hasType(type));
+                spec = spec.and(ProductSpecifications.hasPriceBetween(minPrice, maxPrice, type));
+            }
+        }
 
         if (query != null && !query.trim().isEmpty()) {
             spec = spec.and(ProductSpecifications.hasKeyword(query));
@@ -216,7 +261,6 @@ public class ProductServiceImpl implements ProductService {
             spec = spec.and(ProductSpecifications.hasPriceBetween(minPrice, maxPrice, type));
         }
 
-       
         var pg = productRepository.findAll(spec, pageRequest);
         List<ProductDTO> content = pg.getContent().stream().map(this::toDto).collect(Collectors.toList());
         return new PageImpl<>(content, pg.getPageable(), pg.getTotalElements());
