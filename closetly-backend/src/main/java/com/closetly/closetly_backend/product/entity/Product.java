@@ -51,6 +51,12 @@ public class Product {
 
     private Integer quantity;
 
+    private Double latitude;
+
+    private Double longitude;
+
+    private String city;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "seller_id", nullable = false)
     private User seller;

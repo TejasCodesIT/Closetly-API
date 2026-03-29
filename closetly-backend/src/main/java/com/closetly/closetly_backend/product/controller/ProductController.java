@@ -54,34 +54,42 @@ public class ProductController {
     }
 
     @GetMapping("/search")
-public ResponseEntity<ProductSearchResponse> search(
-        @RequestParam(required = false) String query,
-        @RequestParam(required = false) String brand,
-        @RequestParam(required = false) String category,
-        @RequestParam(required = false) String size,
-        @RequestParam(required = false, name = "condition") String condition,
-        @RequestParam(required = false) Double minPrice,
-        @RequestParam(required = false) Double maxPrice,
-        @RequestParam(required = false) String type, // ✅ NEW
-        @RequestParam(required = false, defaultValue = "newest") String sort,
-        @RequestParam(defaultValue = "0") int page,
-        @RequestParam(defaultValue = "20") int sizePerPage) {
+    public ResponseEntity<ProductSearchResponse> search(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) String brand,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String size,
+            @RequestParam(required = false, name = "condition") String condition,
+            @RequestParam(required = false) Double minPrice,
+            @RequestParam(required = false) Double maxPrice,
+            @RequestParam(required = false) String type, // ✅ NEW
+            @RequestParam(required = false, defaultValue = "newest") String sort,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int sizePerPage) {
 
-    var results = productService.searchProducts(
-            query,
-            brand,
-            category,
-            size,
-            condition,
-            minPrice,
-            maxPrice,
-            type,   // ✅ pass this
-            sort,
-            page,
-            sizePerPage);
+        var results = productService.searchProducts(
+                query,
+                brand,
+                category,
+                size,
+                condition,
+                minPrice,
+                maxPrice,
+                type, // ✅ pass this
+                sort,
+                page,
+                sizePerPage);
 
-    return ResponseEntity.ok(ProductSearchResponse.fromPage(results));
-}
+        return ResponseEntity.ok(ProductSearchResponse.fromPage(results));
+    }
+
+    @GetMapping("/nearby")
+    public ResponseEntity<List<ProductDTO>> nearby(
+            @RequestParam double lat,
+            @RequestParam double lng,
+            @RequestParam(defaultValue = "20") double radius) {
+        return ResponseEntity.ok(productService.findNearbyProducts(lat, lng, radius));
+    }
 
     @GetMapping
     public ResponseEntity<Page<ProductDTO>> list(

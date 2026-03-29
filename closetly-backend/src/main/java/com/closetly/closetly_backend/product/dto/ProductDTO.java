@@ -23,5 +23,9 @@ public class ProductDTO {
     private boolean isForRent;
     private Integer quantity;
     private Long sellerId;
+    private Double latitude;
+    private Double longitude;
+    private String city;
+    private Double distance;
     private List<String> images;
 }

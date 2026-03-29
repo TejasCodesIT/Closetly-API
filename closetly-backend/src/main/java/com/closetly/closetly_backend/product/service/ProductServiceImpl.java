@@ -95,6 +95,9 @@ public class ProductServiceImpl implements ProductService {
                 .productCondition(request.getCondition())
                 .productType(productType)
                 .salePrice(firstNonNull(request.getSalePrice(), buyPrice))
+                .latitude(request.getLatitude())
+                .longitude(request.getLongitude())
+                .city(request.getCity())
                 .rentPricePerDay(request.getRentPricePerDay())
                 .buyPrice(buyPrice)
                 .popularity(0)
@@ -158,6 +161,9 @@ public class ProductServiceImpl implements ProductService {
         existing.setForSale(forSale);
         existing.setForRent(forRent);
         existing.setQuantity(request.getQuantity());
+        existing.setLatitude(request.getLatitude());
+        existing.setLongitude(request.getLongitude());
+        existing.setCity(request.getCity());
         existing.setImages(request.getImages());
 
         Product updated = productRepository.save(existing);
@@ -206,6 +212,32 @@ public class ProductServiceImpl implements ProductService {
         var pg = productRepository.findByStatus(ProductStatus.ACTIVE, PageRequest.of(page, size));
         List<ProductDTO> content = pg.getContent().stream().map(this::toDto).collect(Collectors.toList());
         return new PageImpl<>(content, pg.getPageable(), pg.getTotalElements());
+    }
+
+    @Override
+    public List<ProductDTO> findNearbyProducts(double lat, double lng, double radiusKm) {
+        List<Product> nearby = productRepository.findNearby(lat, lng, radiusKm);
+        return nearby.stream()
+                .map(product -> {
+                    ProductDTO dto = toDto(product);
+                    dto.setDistance(calculateDistance(lat, lng, product.getLatitude(), product.getLongitude()));
+                    return dto;
+                })
+                .collect(Collectors.toList());
+    }
+
+    private double calculateDistance(double lat1, double lng1, Double lat2, Double lng2) {
+        if (lat2 == null || lng2 == null) {
+            return Double.MAX_VALUE;
+        }
+        final int EARTH_RADIUS_KM = 6371;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLng = Math.toRadians(lng2 - lng1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                        * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return EARTH_RADIUS_KM * c;
     }
 
     @Override
@@ -296,6 +328,9 @@ public class ProductServiceImpl implements ProductService {
         dto.setForSale(p.allowsBuy());
         dto.setForRent(p.allowsRent());
         dto.setQuantity(p.getQuantity());
+        dto.setLatitude(p.getLatitude());
+        dto.setLongitude(p.getLongitude());
+        dto.setCity(p.getCity());
         dto.setSellerId(p.getSeller() != null ? p.getSeller().getId() : null);
         dto.setImages(p.getImages());
         return dto;

@@ -40,6 +40,14 @@ public class ProductRequestDTO {
     @NotNull
     private Integer quantity;
 
+    @NotNull(message = "Product location is required")
+    private Double latitude;
+
+    @NotNull(message = "Product location is required")
+    private Double longitude;
+
+    private String city;
+
     private Long sellerId; // id of the user listing this product
 
     private List<String> images;
@@ -74,6 +82,11 @@ public class ProductRequestDTO {
                     rentPricePerDay);
             throw new IllegalArgumentException(
                     "rentPricePerDay is required and must be positive when isForRent is true");
+        }
+
+        if (latitude == null || longitude == null) {
+            log.error("[ProductRequestDTO Validation] Missing latitude/longitude");
+            throw new IllegalArgumentException("Product location is required");
         }
 
         if (images == null || images.isEmpty()) {
