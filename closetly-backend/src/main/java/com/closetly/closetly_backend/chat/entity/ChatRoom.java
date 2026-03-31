@@ -14,44 +14,49 @@ import java.util.List;
 @Data
 @Builder
 @Entity
-@Table(
-        name = "chat_rooms",
-        uniqueConstraints = {
-                @UniqueConstraint(name = "uq_chat_rooms_product_buyer", columnNames = {"product_id", "buyer_id"})
-        }
-)
+@Table(name = "chat_rooms", uniqueConstraints = {
+                @UniqueConstraint(name = "uq_chat_rooms_booking_deleted", columnNames = { "booking_id", "deleted" }),
+                @UniqueConstraint(name = "uq_chat_rooms_order_deleted", columnNames = { "order_id", "deleted" }),
+                @UniqueConstraint(name = "uq_chat_rooms_product_buyer_seller_deleted", columnNames = { "product_id",
+                                "buyer_id", "seller_id", "deleted" })
+})
 @Where(clause = "deleted = false")
 @NoArgsConstructor
 @AllArgsConstructor
 public class ChatRoom {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
+        private Long id;
 
-    // Optional: rental chats come from an approved booking; purchase chats don't.
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "booking_id", nullable = true)
-    private Booking booking;
+        // Optional: rental chats come from an approved booking; purchase chats use
+        // order reference.
+        @OneToOne(fetch = FetchType.LAZY, optional = true)
+        @JoinColumn(name = "booking_id", nullable = true)
+        private Booking booking;
 
-    @Column(name = "product_id")
-    private Long productId;
+        @ManyToOne(fetch = FetchType.LAZY, optional = true)
+        @JoinColumn(name = "order_id", nullable = true)
+        private com.closetly.closetly_backend.order.entity.Order order;
 
-    @Column(name = "buyer_id")
-    private Long buyerId;
+        @Column(name = "product_id")
+        private Long productId;
 
-    @Column(name = "seller_id")
-    private Long sellerId;
+        @Column(name = "buyer_id")
+        private Long buyerId;
 
-    @OneToMany(mappedBy = "chatRoom", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<Message> messages = new ArrayList<>();
+        @Column(name = "seller_id")
+        private Long sellerId;
 
-    @CreationTimestamp
-    private LocalDateTime createdAt;
+        @OneToMany(mappedBy = "chatRoom", cascade = CascadeType.ALL, orphanRemoval = true)
+        @Builder.Default
+        private List<Message> messages = new ArrayList<>();
 
-    @UpdateTimestamp
-    private LocalDateTime updatedAt;
+        @CreationTimestamp
+        private LocalDateTime createdAt;
 
-    @Builder.Default
-    private boolean deleted = false;
+        @UpdateTimestamp
+        private LocalDateTime updatedAt;
+
+        @Builder.Default
+        private boolean deleted = false;
 }

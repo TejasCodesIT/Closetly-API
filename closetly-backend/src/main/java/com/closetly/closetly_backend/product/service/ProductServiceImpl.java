@@ -77,12 +77,22 @@ public class ProductServiceImpl implements ProductService {
         log.debug("[Product Creation] Request images count: {}",
                 request.getImages() != null ? request.getImages().size() : 0);
 
+        // Debug: Log the values being passed to resolveProductType
+        log.info("[Product Creation] INPUT TO resolveProductType - productType: '{}', isForRent: {}, isForSale: {}",
+                request.getProductType(), request.isForRent(), request.isForSale());
+
         ProductType productType = resolveProductType(request.getProductType(), request.isForRent(),
                 request.isForSale());
+
+        log.info("[Product Creation] OUTPUT FROM resolveProductType - productType: {}",
+                productType);
+
         boolean forRent = productType == ProductType.RENT || productType == ProductType.BOTH;
         boolean forSale = productType == ProductType.BUY || productType == ProductType.BOTH;
         Double buyPrice = firstNonNull(request.getBuyPrice(), request.getSalePrice());
 
+        log.info("[Product Creation] BOOLEAN FLAGS CALCULATED - forSale: {}, forRent: {}",
+                forSale, forRent);
         log.info("[Product Creation] Resolved productType: {}, forRent: {}, forSale: {}",
                 productType, forRent, forSale);
 
@@ -98,16 +108,24 @@ public class ProductServiceImpl implements ProductService {
                 .latitude(request.getLatitude())
                 .longitude(request.getLongitude())
                 .city(request.getCity())
+                .address(request.getAddress())
+                .state(request.getState() != null ? request.getState() : "Maharashtra")
                 .rentPricePerDay(request.getRentPricePerDay())
                 .buyPrice(buyPrice)
                 .popularity(0)
-                .isForSale(forSale)
-                .isForRent(forRent)
+                .forSale(forSale)
+                .forRent(forRent)
                 .quantity(request.getQuantity())
                 .images(request.getImages())
                 .seller(seller)
                 .status(Product.ProductStatus.ACTIVE)
                 .build();
+
+        // Debug: Log entity values immediately after building
+        log.info("[Product Creation] ENTITY BUILT - productType: {}, forSale: {}, forRent: {}",
+                product.getProductType(), product.isForSale(), product.isForRent());
+        log.info("[Product Creation] ENTITY BUILT - salePrice: {}, rentPricePerDay: {}",
+                product.getSalePrice(), product.getRentPricePerDay());
 
         log.debug("[Product Creation] Entity before save - title: {}, description: '{}' (length: {})",
                 product.getTitle(),
@@ -115,6 +133,10 @@ public class ProductServiceImpl implements ProductService {
                 product.getDescription() != null ? product.getDescription().length() : 0);
 
         Product saved = productRepository.save(product);
+
+        // Debug: Log entity values immediately after saving
+        log.info("[Product Creation] ENTITY SAVED - id: {}, productType: {}, forSale: {}, forRent: {}",
+                saved.getId(), saved.getProductType(), saved.isForSale(), saved.isForRent());
 
         log.info("[Product Creation] Product saved successfully - id: {}, title: {}",
                 saved.getId(), saved.getTitle());
@@ -164,6 +186,8 @@ public class ProductServiceImpl implements ProductService {
         existing.setLatitude(request.getLatitude());
         existing.setLongitude(request.getLongitude());
         existing.setCity(request.getCity());
+        existing.setAddress(request.getAddress());
+        existing.setState(request.getState() != null ? request.getState() : "Maharashtra");
         existing.setImages(request.getImages());
 
         Product updated = productRepository.save(existing);
@@ -215,15 +239,25 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    public List<ProductDTO> findNearbyProducts(double lat, double lng, double radiusKm) {
-        List<Product> nearby = productRepository.findNearby(lat, lng, radiusKm);
-        return nearby.stream()
+    public Page<ProductDTO> findNearbyProducts(double lat, double lng, double radiusKm, int page, int size,
+            String sort) {
+        // For nearby search, we use fixed sorting: distance ASC, then created_at DESC
+        // The SQL query handles this, so we use unsorted Pageable for pagination only
+        var pageable = PageRequest.of(page, size);
+        Page<Product> nearbyPage = productRepository.findNearby(lat, lng, radiusKm, pageable);
+
+        List<ProductDTO> content = nearbyPage.getContent().stream()
                 .map(product -> {
                     ProductDTO dto = toDto(product);
-                    dto.setDistance(calculateDistance(lat, lng, product.getLatitude(), product.getLongitude()));
+                    // Calculate distance in Java - this ensures accurate results
+                    double calculatedDistance = calculateDistance(lat, lng, product.getLatitude(),
+                            product.getLongitude());
+                    dto.setDistance(calculatedDistance);
                     return dto;
                 })
                 .collect(Collectors.toList());
+
+        return new PageImpl<>(content, nearbyPage.getPageable(), nearbyPage.getTotalElements());
     }
 
     private double calculateDistance(double lat1, double lng1, Double lat2, Double lng2) {
@@ -305,9 +339,23 @@ public class ProductServiceImpl implements ProductService {
         return switch (sort.toLowerCase().trim()) {
             case "price-low" -> Sort.by(Sort.Direction.ASC, "salePrice");
             case "price-high" -> Sort.by(Sort.Direction.DESC, "salePrice");
-            case "popularity" -> Sort.by(Sort.Direction.DESC, "popularity");
+            case "popularity", "popular" -> Sort.by(Sort.Direction.DESC, "popularity");
             case "newest" -> Sort.by(Sort.Direction.DESC, "createdAt");
             default -> Sort.by(Sort.Direction.DESC, "createdAt");
+        };
+    }
+
+    private Sort toSortForNearby(String sort) {
+        if (sort == null || sort.trim().isEmpty()) {
+            return Sort.unsorted(); // Let the native query handle distance sorting
+        }
+        return switch (sort.toLowerCase().trim()) {
+            case "distance" -> Sort.unsorted(); // Native query already sorts by distance
+            case "price-low" -> Sort.by(Sort.Direction.ASC, "salePrice");
+            case "price-high" -> Sort.by(Sort.Direction.DESC, "salePrice");
+            case "popularity", "popular" -> Sort.by(Sort.Direction.DESC, "popularity");
+            case "newest" -> Sort.by(Sort.Direction.DESC, "createdAt");
+            default -> Sort.unsorted(); // Default to distance sorting
         };
     }
 
@@ -325,12 +373,15 @@ public class ProductServiceImpl implements ProductService {
         dto.setRentPricePerDay(p.getRentPricePerDay());
         dto.setBuyPrice(firstNonNull(p.getBuyPrice(), p.getSalePrice()));
         dto.setPopularity(p.getPopularity());
-        dto.setForSale(p.allowsBuy());
-        dto.setForRent(p.allowsRent());
+        // Use entity fields directly instead of helper methods
+        dto.setForSale(p.isForSale());
+        dto.setForRent(p.isForRent());
         dto.setQuantity(p.getQuantity());
         dto.setLatitude(p.getLatitude());
         dto.setLongitude(p.getLongitude());
         dto.setCity(p.getCity());
+        dto.setAddress(p.getAddress());
+        dto.setState(p.getState());
         dto.setSellerId(p.getSeller() != null ? p.getSeller().getId() : null);
         dto.setImages(p.getImages());
         return dto;
@@ -338,17 +389,23 @@ public class ProductServiceImpl implements ProductService {
 
     private static ProductType resolveProductType(ProductType explicit, boolean isForRent, boolean isForSale) {
         if (explicit != null) {
+            System.out.println("[resolveProductType] Using explicit productType: " + explicit);
             return explicit;
         }
+        // Fallback to boolean flags if no explicit productType
         if (isForRent && isForSale) {
+            System.out.println("[resolveProductType] Both rent and sale flags true -> returning BOTH");
             return ProductType.BOTH;
         }
         if (isForRent) {
+            System.out.println("[resolveProductType] Only rent flag true -> returning RENT");
             return ProductType.RENT;
         }
         if (isForSale) {
+            System.out.println("[resolveProductType] Only sale flag true -> returning BUY");
             return ProductType.BUY;
         }
+        System.out.println("[resolveProductType] No flags set -> defaulting to RENT");
         return ProductType.RENT;
     }
 

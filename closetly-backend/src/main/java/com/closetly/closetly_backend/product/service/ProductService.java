@@ -32,5 +32,5 @@ public interface ProductService {
             int page,
             int sizePerPage);
 
-    List<ProductDTO> findNearbyProducts(double lat, double lng, double radiusKm);
+    Page<ProductDTO> findNearbyProducts(double lat, double lng, double radiusKm, int page, int size, String sort);
 }

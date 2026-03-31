@@ -11,6 +11,9 @@ public class OrderDTO {
     private Long customerId;
     private String customerName;
     private String customerEmail;
+    private Long sellerId;
+    private String sellerName;
+    private String sellerEmail;
     private List<OrderItemDTO> orderItems;
     private Double totalAmount;
     private Integer totalItems;

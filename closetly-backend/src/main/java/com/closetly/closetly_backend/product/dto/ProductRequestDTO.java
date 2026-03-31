@@ -47,6 +47,8 @@ public class ProductRequestDTO {
     private Double longitude;
 
     private String city;
+    private String address;
+    private String state;
 
     private Long sellerId; // id of the user listing this product
 

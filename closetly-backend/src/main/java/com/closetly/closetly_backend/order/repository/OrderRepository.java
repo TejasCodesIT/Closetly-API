@@ -71,6 +71,19 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                         @Param("statuses") Collection<OrderStatus> statuses);
 
         /**
+         * Find all orders for a seller with their items and products
+         * Ordered by creation date (newest first)
+         * Uses LEFT JOIN FETCH to prevent N+1 queries
+         */
+        @Query("SELECT o FROM Order o " +
+                        "LEFT JOIN FETCH o.orderItems oi " +
+                        "LEFT JOIN FETCH oi.product " +
+                        "WHERE o.seller.id = :sellerId " +
+                        "ORDER BY o.createdAt DESC")
+        @EntityGraph(attributePaths = { "orderItems.product.images" })
+        List<Order> findBySellerIdWithItemsAndProducts(@Param("sellerId") Long sellerId);
+
+        /**
          * Find all orders with a specific status
          * Useful for order management (e.g., finding all shipped orders)
          */

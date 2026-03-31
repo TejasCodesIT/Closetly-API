@@ -1,6 +1,7 @@
 package com.closetly.closetly_backend.product.dto;
 
 import com.closetly.closetly_backend.product.entity.ProductType;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.util.List;
@@ -19,13 +20,22 @@ public class ProductDTO {
     private Double rentPricePerDay;
     private Double buyPrice;
     private Integer popularity;
-    private boolean isForSale;
-    private boolean isForRent;
+
+    // Fixed: renamed to forSale/forRent to match Entity and Service layer
+    // @JsonProperty maintains backward compatibility with API clients
+    @JsonProperty("isForSale")
+    private boolean forSale;
+
+    @JsonProperty("isForRent")
+    private boolean forRent;
+
     private Integer quantity;
     private Long sellerId;
     private Double latitude;
     private Double longitude;
     private String city;
+    private String address;
+    private String state;
     private Double distance;
     private List<String> images;
 }

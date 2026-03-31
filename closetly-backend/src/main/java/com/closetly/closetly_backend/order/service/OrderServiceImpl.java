@@ -77,6 +77,7 @@ public class OrderServiceImpl implements OrderService {
 
         Order order = Order.builder()
                 .customer(customer)
+                .seller(product.getSeller())
                 .orderItems(List.of(orderItem))
                 .totalAmount(price)
                 .totalItems(1)
@@ -169,6 +170,7 @@ public class OrderServiceImpl implements OrderService {
         // Create order
         Order order = Order.builder()
                 .customer(customer)
+                .seller(orderItems.get(0).getProduct().getSeller()) // Assume all items from same seller
                 .orderItems(orderItems)
                 .totalAmount(totalAmount)
                 .totalItems(totalItems)
@@ -318,6 +320,7 @@ public class OrderServiceImpl implements OrderService {
         // 7. Create the Order with calculated totals
         Order order = Order.builder()
                 .customer(customer)
+                .seller(orderItems.get(0).getProduct().getSeller()) // Assume all items from same seller
                 .orderItems(orderItems)
                 .totalAmount(totalAmount)
                 .totalItems(totalItems)
@@ -406,6 +409,9 @@ public class OrderServiceImpl implements OrderService {
         dto.setCustomerId(order.getCustomer().getId());
         dto.setCustomerName(order.getCustomer().getFullName());
         dto.setCustomerEmail(order.getCustomer().getEmail());
+        dto.setSellerId(order.getSeller().getId());
+        dto.setSellerName(order.getSeller().getFullName());
+        dto.setSellerEmail(order.getSeller().getEmail());
         dto.setOrderItems(order.getOrderItems().stream().map(this::toOrderItemDto).toList());
         dto.setTotalAmount(order.getTotalAmount());
         dto.setTotalItems(order.getTotalItems());
@@ -464,5 +470,72 @@ public class OrderServiceImpl implements OrderService {
 
     private static <T> T firstNonNull(T a, T b) {
         return a != null ? a : b;
+    }
+
+    // ========== NEW METHODS FOR BUY FLOW ==========
+
+    @Override
+    public List<OrderDTO> getSellerOrders(String email) {
+        User seller = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Seller not found"));
+
+        List<Order> orders = orderRepository.findBySellerIdWithItemsAndProducts(seller.getId());
+        return orders.stream().map(this::toDto).toList();
+    }
+
+    @Override
+    @Transactional
+    public OrderDTO approveOrder(Long orderId, String email) {
+        User seller = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Seller not found"));
+
+        Order order = orderRepository.findByIdWithItemsAndProducts(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found"));
+
+        // Verify seller owns this order
+        if (!order.getSeller().getId().equals(seller.getId())) {
+            throw new IllegalStateException("You can only approve orders for your own products");
+        }
+
+        // Can only approve PLACED orders
+        if (order.getStatus() != OrderStatus.PLACED) {
+            throw new IllegalStateException("Order can only be approved if it's in PLACED status");
+        }
+
+        order.setStatus(OrderStatus.APPROVED);
+        Order saved = orderRepository.save(order);
+
+        // TODO: Send notification to customer
+        // TODO: Create chat room automatically
+
+        return toDto(saved);
+    }
+
+    @Override
+    @Transactional
+    public OrderDTO rejectOrder(Long orderId, String email) {
+        User seller = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Seller not found"));
+
+        Order order = orderRepository.findByIdWithItemsAndProducts(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found"));
+
+        // Verify seller owns this order
+        if (!order.getSeller().getId().equals(seller.getId())) {
+            throw new IllegalStateException("You can only reject orders for your own products");
+        }
+
+        // Can only reject PLACED orders
+        if (order.getStatus() != OrderStatus.PLACED) {
+            throw new IllegalStateException("Order can only be rejected if it's in PLACED status");
+        }
+
+        order.setStatus(OrderStatus.REJECTED);
+        Order saved = orderRepository.save(order);
+
+        // TODO: Send notification to customer
+        // TODO: Restore product quantities for BUY items
+
+        return toDto(saved);
     }
 }

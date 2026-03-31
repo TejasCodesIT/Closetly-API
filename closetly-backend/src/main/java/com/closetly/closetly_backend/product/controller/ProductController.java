@@ -84,11 +84,15 @@ public class ProductController {
     }
 
     @GetMapping("/nearby")
-    public ResponseEntity<List<ProductDTO>> nearby(
+    public ResponseEntity<ProductSearchResponse> nearby(
             @RequestParam double lat,
             @RequestParam double lng,
-            @RequestParam(defaultValue = "20") double radius) {
-        return ResponseEntity.ok(productService.findNearbyProducts(lat, lng, radius));
+            @RequestParam(defaultValue = "20") double radius,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "distance") String sort) {
+        var results = productService.findNearbyProducts(lat, lng, radius, page, size, sort);
+        return ResponseEntity.ok(ProductSearchResponse.fromPage(results));
     }
 
     @GetMapping

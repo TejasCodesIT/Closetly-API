@@ -49,9 +49,7 @@ public class ChatServiceImpl implements ChatService {
     private EntityManager entityManager;
 
     private static final List<OrderStatus> PURCHASED_STATUSES = List.of(
-            OrderStatus.PAID,
-            OrderStatus.SHIPPED,
-            OrderStatus.DELIVERED);
+            OrderStatus.APPROVED);
 
     @Override
     @Transactional
@@ -77,9 +75,15 @@ public class ChatServiceImpl implements ChatService {
         if (!authUserId.equals(buyerId) && !authUserId.equals(sellerId))
             throw new AccessDeniedException("You are not a participant of this booking");
 
-        Optional<ChatRoom> existingRoom = chatRoomRepository.findByProductIdAndBuyerId(productId, buyerId);
-        if (existingRoom.isPresent())
-            return toDto(existingRoom.get(), authUserId);
+        Optional<ChatRoom> existingRoom = findExistingRoom(booking, null, productId, buyerId, sellerId);
+        if (existingRoom.isPresent()) {
+            ChatRoom room = existingRoom.get();
+            if (room.isDeleted()) {
+                room.setDeleted(false);
+                room = chatRoomRepository.saveAndFlush(room);
+            }
+            return toDto(room, authUserId);
+        }
 
         ChatRoom newRoom = ChatRoom.builder()
                 .booking(booking)
@@ -128,10 +132,16 @@ public class ChatServiceImpl implements ChatService {
         if (!authUserId.equals(buyerId) && !authUserId.equals(sellerId))
             throw new AccessDeniedException("You are not a participant of this chat");
 
-        // ✅ Safe check with pessimistic lock
-        Optional<ChatRoom> existingRoom = chatRoomRepository.findByProductIdAndBuyerId(productId, buyerId);
-        if (existingRoom.isPresent())
-            return toDto(existingRoom.get(), authUserId);
+        // Prefer canonical (booking/order) room by ID first.
+        Optional<ChatRoom> existingRoom = findExistingRoom(booking, order, productId, buyerId, sellerId);
+        if (existingRoom.isPresent()) {
+            ChatRoom room = existingRoom.get();
+            if (room.isDeleted()) {
+                room.setDeleted(false);
+                room = chatRoomRepository.saveAndFlush(room);
+            }
+            return toDto(room, authUserId);
+        }
 
         if (booking != null && booking.getStatus() != BookingStatus.APPROVED)
             throw new IllegalArgumentException("Chat room can only be created after rent approval");
@@ -141,6 +151,7 @@ public class ChatServiceImpl implements ChatService {
 
         ChatRoom newRoom = ChatRoom.builder()
                 .booking(booking)
+                .order(order)
                 .productId(productId)
                 .buyerId(buyerId)
                 .sellerId(sellerId)
@@ -170,6 +181,30 @@ public class ChatServiceImpl implements ChatService {
         return messageRepository.findByChatRoomIdWithSender(chatRoomId).stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
+    }
+
+    private Optional<ChatRoom> findExistingRoom(Booking booking, Order order, Long productId, Long buyerId,
+            Long sellerId) {
+        if (booking != null) {
+            Optional<ChatRoom> room = chatRoomRepository.findByBookingId(booking.getId());
+            if (room.isEmpty())
+                room = chatRoomRepository.findByBookingIdIncludeDeleted(booking.getId());
+            if (room.isPresent())
+                return room;
+        }
+
+        if (order != null) {
+            Optional<ChatRoom> room = chatRoomRepository.findByOrderId(order.getId());
+            if (room.isEmpty())
+                room = chatRoomRepository.findByOrderIdIncludeDeleted(order.getId());
+            if (room.isPresent())
+                return room;
+        }
+
+        Optional<ChatRoom> room = chatRoomRepository.findByProductIdAndBuyerIdAndSellerId(productId, buyerId, sellerId);
+        if (room.isEmpty())
+            room = chatRoomRepository.findByProductIdAndBuyerIdAndSellerIdIncludeDeleted(productId, buyerId, sellerId);
+        return room;
     }
 
     @Override

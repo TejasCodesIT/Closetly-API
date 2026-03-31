@@ -36,6 +36,10 @@ public class Order {
     @JoinColumn(name = "customer_id", nullable = false)
     private User customer;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "seller_id", nullable = false)
+    private User seller;
+
     /**
      * One-to-many relationship with OrderItem
      * - mappedBy: indicates OrderItem.order is the owning side
@@ -63,9 +67,8 @@ public class Order {
 
     public enum OrderStatus {
         PLACED,
-        PAID,
-        SHIPPED,
-        DELIVERED,
+        APPROVED,
+        REJECTED,
         CANCELLED
     }
 }

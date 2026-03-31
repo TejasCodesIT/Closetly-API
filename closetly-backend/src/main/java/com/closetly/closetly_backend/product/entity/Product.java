@@ -44,10 +44,18 @@ public class Product {
 
     private Integer popularity = 0;
 
+    // FIX: Rename fields to avoid Lombok/Jackson issues with "is" prefix boolean
+    // fields
+    // Changed: isForSale -> forSale, isForRent -> forRent
+    // @JsonProperty("isForSale") is used to maintain backward compatibility with
+    // API
     @JsonProperty("isForSale")
-    private boolean isForSale;
+    @Column(name = "is_for_sale")
+    private boolean forSale;
+
     @JsonProperty("isForRent")
-    private boolean isForRent;
+    @Column(name = "is_for_rent")
+    private boolean forRent;
 
     private Integer quantity;
 
@@ -55,7 +63,13 @@ public class Product {
 
     private Double longitude;
 
+    private String address;
     private String city;
+
+    private String state;
+
+    @Transient
+    private Double distance;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "seller_id", nullable = false)
@@ -79,14 +93,14 @@ public class Product {
 
     public boolean allowsRent() {
         if (productType == null) {
-            return isForRent;
+            return forRent;
         }
         return productType == ProductType.RENT || productType == ProductType.BOTH;
     }
 
     public boolean allowsBuy() {
         if (productType == null) {
-            return isForSale;
+            return forSale;
         }
         return productType == ProductType.BUY || productType == ProductType.BOTH;
     }

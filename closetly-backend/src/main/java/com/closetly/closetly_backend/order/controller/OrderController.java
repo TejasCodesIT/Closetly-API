@@ -57,4 +57,27 @@ public class OrderController {
         String email = authentication.getName();
         return ResponseEntity.ok(orderService.getOrderById(orderId, email));
     }
+
+    // ========== NEW ENDPOINTS FOR BUY FLOW ==========
+
+    // Get orders received by seller (for approval/rejection)
+    @GetMapping("/seller")
+    public ResponseEntity<List<OrderDTO>> getSellerOrders(Authentication authentication) {
+        String email = authentication.getName();
+        return ResponseEntity.ok(orderService.getSellerOrders(email));
+    }
+
+    // Approve order (seller only)
+    @PostMapping("/{orderId}/approve")
+    public ResponseEntity<OrderDTO> approveOrder(@PathVariable Long orderId, Authentication authentication) {
+        String email = authentication.getName();
+        return ResponseEntity.ok(orderService.approveOrder(orderId, email));
+    }
+
+    // Reject order (seller only)
+    @PostMapping("/{orderId}/reject")
+    public ResponseEntity<OrderDTO> rejectOrder(@PathVariable Long orderId, Authentication authentication) {
+        String email = authentication.getName();
+        return ResponseEntity.ok(orderService.rejectOrder(orderId, email));
+    }
 }

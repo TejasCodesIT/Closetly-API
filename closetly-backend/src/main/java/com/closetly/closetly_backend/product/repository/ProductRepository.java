@@ -15,16 +15,42 @@ import java.util.List;
 
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpecificationExecutor<Product> {
-    Page<Product> findByStatus(ProductStatus status, Pageable pageable);
+        Page<Product> findByStatus(ProductStatus status, Pageable pageable);
 
-    List<Product> findBySeller_IdOrderByCreatedAtDesc(Long sellerId);
+        List<Product> findBySeller_IdOrderByCreatedAtDesc(Long sellerId);
 
-    @Query(value = "SELECT p.* FROM products p " +
-            "WHERE p.status = 'ACTIVE' AND p.deleted = false " +
-            "AND (6371 * acos(cos(radians(:lat)) * cos(radians(p.latitude)) * cos(radians(p.longitude) - radians(:lng)) + sin(radians(:lat)) * sin(radians(p.latitude)))) < :radius "
-            +
-            "ORDER BY (6371 * acos(cos(radians(:lat)) * cos(radians(p.latitude)) * cos(radians(p.longitude) - radians(:lng)) + sin(radians(:lat)) * sin(radians(p.latitude)))) ASC", nativeQuery = true)
-    List<Product> findNearby(@Param("lat") double lat, @Param("lng") double lng, @Param("radius") double radius);
+        @Query(value = """
+                        SELECT p.*,
+                        (6371 * acos(
+                            cos(radians(:lat))
+                            * cos(radians(p.latitude))
+                            * cos(radians(p.longitude) - radians(:lng))
+                            + sin(radians(:lat))
+                            * sin(radians(p.latitude))
+                        )) AS distance
+                        FROM products p
+                        WHERE p.status = 'ACTIVE'
+                        AND p.deleted = false
+                        HAVING distance < :radius
+                        ORDER BY distance ASC, p.created_at DESC
+                        """, countQuery = """
+                        SELECT COUNT(*) FROM (
+                            SELECT p.*,
+                            (6371 * acos(
+                                cos(radians(:lat))
+                                * cos(radians(p.latitude))
+                                * cos(radians(p.longitude) - radians(:lng))
+                                + sin(radians(:lat))
+                                * sin(radians(p.latitude))
+                            )) AS distance
+                            FROM products p
+                            WHERE p.status = 'ACTIVE'
+                            AND p.deleted = false
+                            HAVING distance < :radius
+                        ) AS subquery
+                        """, nativeQuery = true)
+        Page<Product> findNearby(@Param("lat") double lat, @Param("lng") double lng, @Param("radius") double radius,
+                        Pageable pageable);
 
-    long countByCreatedAtAfter(LocalDateTime dateTime);
+        long countByCreatedAtAfter(LocalDateTime dateTime);
 }

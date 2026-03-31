@@ -22,4 +22,13 @@ public interface OrderService {
 
     // Get order by ID with full details
     OrderDTO getOrderById(Long orderId, String email);
+
+    // NEW: Get orders received by seller (for approval/rejection)
+    List<OrderDTO> getSellerOrders(String email);
+
+    // NEW: Approve order (seller only)
+    OrderDTO approveOrder(Long orderId, String email);
+
+    // NEW: Reject order (seller only)
+    OrderDTO rejectOrder(Long orderId, String email);
 }
