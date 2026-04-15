@@ -4,14 +4,18 @@ import com.closetly.closetly_backend.order.dto.CreateOrderRequestDTO;
 import com.closetly.closetly_backend.order.dto.OrderDTO;
 import com.closetly.closetly_backend.order.dto.OrderRequestDTO;
 import com.closetly.closetly_backend.order.dto.OrderResponseDTO;
+import com.closetly.closetly_backend.order.dto.SellerOrderItemDTO;
 import com.closetly.closetly_backend.order.service.OrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+
+import java.util.List;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -38,10 +42,10 @@ public class OrderController {
 
     // E-commerce style checkout: Create order from all cart items
     @PostMapping("/checkout")
-    public ResponseEntity<OrderDTO> placeOrder(Authentication authentication) {
+    public ResponseEntity<List<OrderDTO>> placeOrder(Authentication authentication) {
         String email = authentication.getName();
-        OrderDTO order = orderService.placeOrder(email);
-        return ResponseEntity.ok(order);
+        List<OrderDTO> orders = orderService.placeOrder(email);
+        return ResponseEntity.ok(orders);
     }
 
     // Get customer's orders
@@ -49,6 +53,34 @@ public class OrderController {
     public ResponseEntity<List<OrderDTO>> getCustomerOrders(Authentication authentication) {
         String email = authentication.getName();
         return ResponseEntity.ok(orderService.getCustomerOrders(email));
+    }
+
+    // New pagination-enabled endpoint for customer orders
+    @GetMapping("/my-orders")
+    public ResponseEntity<Page<OrderDTO>> getMyOrders(Authentication authentication,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        String email = authentication.getName();
+        return ResponseEntity.ok(orderService.getCustomerOrders(email, page, size));
+    }
+
+    // Get pending order requests for seller
+    @GetMapping("/order-requests")
+    public ResponseEntity<Page<OrderDTO>> getOrderRequests(Authentication authentication,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        String email = authentication.getName();
+        return ResponseEntity.ok(orderService.getOrderRequests(email, page, size));
+    }
+
+    // Get order history (customer or seller)
+    @GetMapping("/order-history")
+    public ResponseEntity<Page<OrderDTO>> getOrderHistory(Authentication authentication,
+            @RequestParam(defaultValue = "false") boolean seller,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        String email = authentication.getName();
+        return ResponseEntity.ok(orderService.getOrderHistory(email, seller, page, size));
     }
 
     // Get specific order details
@@ -67,6 +99,17 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getSellerOrders(email));
     }
 
+    // Paginated seller orders endpoint
+    @GetMapping("/seller/order-items")
+    public ResponseEntity<Page<SellerOrderItemDTO>> getSellerOrderItems(
+            Authentication authentication,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        String email = authentication.getName();
+        return ResponseEntity.ok(orderService.getSellerOrderItems(email, page, size));
+    }
+
     // Approve order (seller only)
     @PostMapping("/{orderId}/approve")
     public ResponseEntity<OrderDTO> approveOrder(@PathVariable Long orderId, Authentication authentication) {
@@ -79,5 +122,33 @@ public class OrderController {
     public ResponseEntity<OrderDTO> rejectOrder(@PathVariable Long orderId, Authentication authentication) {
         String email = authentication.getName();
         return ResponseEntity.ok(orderService.rejectOrder(orderId, email));
+    }
+
+    // ========== NEW SELLER-CENTRIC ENDPOINTS ==========
+
+    @GetMapping("/order-items/seller")
+    public ResponseEntity<Page<SellerOrderItemDTO>> getSellerOrderItemsALT(
+            Authentication authentication,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        String email = authentication.getName();
+        return ResponseEntity.ok(orderService.getSellerOrderItems(email, page, size));
+    }
+
+    // Approve order item (seller only)
+    @PostMapping("/order-items/{orderItemId}/approve")
+    public ResponseEntity<SellerOrderItemDTO> approveOrderItem(@PathVariable Long orderItemId,
+            Authentication authentication) {
+        String email = authentication.getName();
+        return ResponseEntity.ok(orderService.approveOrderItem(orderItemId, email));
+    }
+
+    // Reject order item (seller only)
+    @PostMapping("/order-items/{orderItemId}/reject")
+    public ResponseEntity<SellerOrderItemDTO> rejectOrderItem(@PathVariable Long orderItemId,
+            Authentication authentication) {
+        String email = authentication.getName();
+        return ResponseEntity.ok(orderService.rejectOrderItem(orderItemId, email));
     }
 }

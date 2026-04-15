@@ -17,7 +17,7 @@ public class ProductDTO {
     private String condition;
     private ProductType productType;
     private Double salePrice;
-    private Double rentPricePerDay;
+    private Double rentPrice;
     private Double buyPrice;
     private Integer popularity;
 

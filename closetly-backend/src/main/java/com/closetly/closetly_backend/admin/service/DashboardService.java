@@ -84,7 +84,7 @@ public class DashboardService {
         String jpql = """
                     SELECT COALESCE(SUM(
                         (CAST(FUNCTION('DATEDIFF', b.endDate, b.startDate) AS long))
-                        * p.rentPricePerDay
+                        * p.rentPrice
                     ), 0.0)
                     FROM Booking b
                     JOIN b.product p

@@ -43,8 +43,8 @@ public class ProductServiceImpl implements ProductService {
         // ✅ Log the DTO values immediately after deserialization
         log.info("[Product Creation] DTO DESERIALIZED - isForSale: {}, isForRent: {}",
                 request.isForSale(), request.isForRent());
-        log.info("[Product Creation] DTO DESERIALIZED - productType: {}, salePrice: {}, rentPricePerDay: {}",
-                request.getProductType(), request.getSalePrice(), request.getRentPricePerDay());
+        log.info("[Product Creation] DTO DESERIALIZED - productType: {}, salePrice: {}, rentPrice: {}",
+                request.getProductType(), request.getSalePrice(), request.getRentPrice());
         log.info("[Product Creation] DTO DESERIALIZED - description: '{}' (length: {})",
                 request.getDescription(),
                 request.getDescription() != null ? request.getDescription().length() : 0);
@@ -72,8 +72,8 @@ public class ProductServiceImpl implements ProductService {
 
         log.debug("[Product Creation] Request details - productType: {}, isForSale: {}, isForRent: {}",
                 request.getProductType(), request.isForSale(), request.isForRent());
-        log.debug("[Product Creation] Request pricing - salePrice: {}, rentPricePerDay: {}",
-                request.getSalePrice(), request.getRentPricePerDay());
+        log.debug("[Product Creation] Request pricing - salePrice: {}, rentPrice: {}",
+                request.getSalePrice(), request.getRentPrice());
         log.debug("[Product Creation] Request images count: {}",
                 request.getImages() != null ? request.getImages().size() : 0);
 
@@ -87,14 +87,21 @@ public class ProductServiceImpl implements ProductService {
         log.info("[Product Creation] OUTPUT FROM resolveProductType - productType: {}",
                 productType);
 
-        boolean forRent = productType == ProductType.RENT || productType == ProductType.BOTH;
-        boolean forSale = productType == ProductType.BUY || productType == ProductType.BOTH;
+        // ✅ FIX: Use the boolean flags directly from the request instead of calculating
+        // from productType
+        // This ensures the flags are saved exactly as selected in the UI
+        boolean forSale = request.isForSale();
+        boolean forRent = request.isForRent();
+
+        log.info("[Product Creation] BOOLEAN FLAGS FROM REQUEST - forSale: {}, forRent: {}",
+                forSale, forRent);
+
+        // Ensure productType is consistent with the flags
+        ProductType resolvedProductType = resolveProductType(request.getProductType(), forRent, forSale);
         Double buyPrice = firstNonNull(request.getBuyPrice(), request.getSalePrice());
 
-        log.info("[Product Creation] BOOLEAN FLAGS CALCULATED - forSale: {}, forRent: {}",
-                forSale, forRent);
-        log.info("[Product Creation] Resolved productType: {}, forRent: {}, forSale: {}",
-                productType, forRent, forSale);
+        log.info("[Product Creation] RESOLVED productType: {} (from explicit: {}, flags: isForRent={}, isForSale={})",
+                resolvedProductType, request.getProductType(), forRent, forSale);
 
         Product product = Product.builder()
                 .title(request.getTitle())
@@ -103,14 +110,14 @@ public class ProductServiceImpl implements ProductService {
                 .category(request.getCategory())
                 .size(request.getSize())
                 .productCondition(request.getCondition())
-                .productType(productType)
+                .productType(resolvedProductType)
                 .salePrice(firstNonNull(request.getSalePrice(), buyPrice))
                 .latitude(request.getLatitude())
                 .longitude(request.getLongitude())
                 .city(request.getCity())
                 .address(request.getAddress())
                 .state(request.getState() != null ? request.getState() : "Maharashtra")
-                .rentPricePerDay(request.getRentPricePerDay())
+                .rentPrice(request.getRentPrice())
                 .buyPrice(buyPrice)
                 .popularity(0)
                 .forSale(forSale)
@@ -124,8 +131,8 @@ public class ProductServiceImpl implements ProductService {
         // Debug: Log entity values immediately after building
         log.info("[Product Creation] ENTITY BUILT - productType: {}, forSale: {}, forRent: {}",
                 product.getProductType(), product.isForSale(), product.isForRent());
-        log.info("[Product Creation] ENTITY BUILT - salePrice: {}, rentPricePerDay: {}",
-                product.getSalePrice(), product.getRentPricePerDay());
+        log.info("[Product Creation] ENTITY BUILT - salePrice: {}, rentPrice: {}",
+                product.getSalePrice(), product.getRentPrice());
 
         log.debug("[Product Creation] Entity before save - title: {}, description: '{}' (length: {})",
                 product.getTitle(),
@@ -170,15 +177,20 @@ public class ProductServiceImpl implements ProductService {
         existing.setCategory(request.getCategory());
         existing.setSize(request.getSize());
         existing.setProductCondition(request.getCondition());
-        ProductType productType = resolveProductType(request.getProductType(), request.isForRent(),
-                request.isForSale());
-        boolean forRent = productType == ProductType.RENT || productType == ProductType.BOTH;
-        boolean forSale = productType == ProductType.BUY || productType == ProductType.BOTH;
+
+        // ✅ FIX: Use the boolean flags directly from the request instead of calculating
+        // from productType
+        boolean forSale = request.isForSale();
+        boolean forRent = request.isForRent();
+        ProductType resolvedProductType = resolveProductType(request.getProductType(), forRent, forSale);
         Double buyPrice = firstNonNull(request.getBuyPrice(), request.getSalePrice());
 
-        existing.setProductType(productType);
+        log.info("[Product Update] BOOLEAN FLAGS FROM REQUEST - forSale: {}, forRent: {}", forSale, forRent);
+        log.info("[Product Update] RESOLVED productType: {}", resolvedProductType);
+
+        existing.setProductType(resolvedProductType);
         existing.setSalePrice(firstNonNull(request.getSalePrice(), buyPrice));
-        existing.setRentPricePerDay(request.getRentPricePerDay());
+        existing.setRentPrice(request.getRentPrice());
         existing.setBuyPrice(buyPrice);
         existing.setForSale(forSale);
         existing.setForRent(forRent);
@@ -233,7 +245,8 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public Page<ProductDTO> listActiveProducts(int page, int size) {
-        var pg = productRepository.findByStatus(ProductStatus.ACTIVE, PageRequest.of(page, size));
+        var pg = productRepository.findByForSaleTrueAndQuantityGreaterThanAndDeletedFalse(0,
+                PageRequest.of(page, size));
         List<ProductDTO> content = pg.getContent().stream().map(this::toDto).collect(Collectors.toList());
         return new PageImpl<>(content, pg.getPageable(), pg.getTotalElements());
     }
@@ -279,7 +292,7 @@ public class ProductServiceImpl implements ProductService {
             String query,
             String brand,
             String category,
-            String size,
+            String itemSize, // ✅ Renamed from 'size'
             String condition,
             Double minPrice,
             Double maxPrice,
@@ -290,20 +303,43 @@ public class ProductServiceImpl implements ProductService {
         Sort sortObj = toSort(sort);
         var pageRequest = PageRequest.of(page, sizePerPage, sortObj);
 
+        // Base specification: not deleted, active, has stock
+        // ✅ REMOVED: .and(ProductSpecifications.isForSale()) - was blocking rent items
         Specification<Product> spec = Specification
                 .where(ProductSpecifications.isNotDeleted())
-                .and(ProductSpecifications.hasStatus(ProductStatus.ACTIVE));
+                .and(ProductSpecifications.hasStatus(ProductStatus.ACTIVE))
+                .and(ProductSpecifications.hasQuantityGreaterThan(0));
 
+        // ✅ FIXED: TYPE FILTER - Now handles rent/buy/both correctly
         if (type != null && !type.trim().isEmpty()) {
+            log.info("[Search] Applying type filter: {}", type);
 
             if (type.equalsIgnoreCase("rent")) {
-                spec = spec.and((root, queryObj, cb) -> cb.isTrue(root.get("isForRent")));
+                // RENT ONLY: forRent=true
+                spec = spec.and((root, queryObj, cb) -> cb.isTrue(root.get("forRent")));
             } else if (type.equalsIgnoreCase("buy")) {
-                spec = spec.and((root, queryObj, cb) -> cb.isTrue(root.get("isForSale")));
+                // BUY ONLY: forSale=true
+                spec = spec.and((root, queryObj, cb) -> cb.isTrue(root.get("forSale")));
+            } else if (type.equalsIgnoreCase("both")) {
+                // BOTH: forRent=true OR forSale=true
+                spec = spec.and((root, queryObj, cb) -> cb.or(
+                        cb.isTrue(root.get("forRent")),
+                        cb.isTrue(root.get("forSale"))));
             }
-            if (type != null && !type.trim().isEmpty()) {
-                // spec = spec.and(ProductSpecifications.hasType(type));
+
+            // Apply price range for the specific type
+            if (minPrice != null || maxPrice != null) {
                 spec = spec.and(ProductSpecifications.hasPriceBetween(minPrice, maxPrice, type));
+            }
+        } else {
+            // ✅ NO TYPE SPECIFIED: Show both rent and buy items
+            spec = spec.and((root, queryObj, cb) -> cb.or(
+                    cb.isTrue(root.get("forRent")),
+                    cb.isTrue(root.get("forSale"))));
+
+            // Apply generic price range
+            if (minPrice != null || maxPrice != null) {
+                spec = spec.and(ProductSpecifications.hasPriceBetween(minPrice, maxPrice, null));
             }
         }
 
@@ -316,15 +352,22 @@ public class ProductServiceImpl implements ProductService {
         if (category != null && !category.trim().isEmpty()) {
             spec = spec.and(ProductSpecifications.hasCategory(category));
         }
-        if (size != null && !size.trim().isEmpty()) {
-            spec = spec.and(ProductSpecifications.hasSize(size));
+        if (itemSize != null && !itemSize.trim().isEmpty()) {
+            // ✅ EXTRA SAFETY: Validate size filter on backend
+            String trimmedSize = itemSize.trim().toLowerCase();
+            if (!trimmedSize.matches("(?i)xs|s|m|l|xl")) {
+                log.warn("[Search] Invalid size filter received: {} - ignoring", itemSize);
+                itemSize = null; // Ignore invalid size
+            } else {
+                log.info("[Search] Applying size filter: {}", trimmedSize);
+                spec = spec.and(ProductSpecifications.hasSize(trimmedSize));
+            }
         }
+
+        // CONDITION FILTER
         if (condition != null && !condition.trim().isEmpty()) {
+            log.info("[Search] Applying condition filter: {}", condition);
             spec = spec.and(ProductSpecifications.hasCondition(condition));
-        }
-        if (minPrice != null || maxPrice != null) {
-            // spec = spec.and(ProductSpecifications.hasPriceBetween(minPrice, maxPrice));
-            spec = spec.and(ProductSpecifications.hasPriceBetween(minPrice, maxPrice, type));
         }
 
         var pg = productRepository.findAll(spec, pageRequest);
@@ -359,6 +402,151 @@ public class ProductServiceImpl implements ProductService {
         };
     }
 
+    @Override
+    public Page<ProductDTO> searchProductsWithLocation(
+            String query,
+            String brand,
+            String category,
+            String itemSize, // ✅ Renamed from 'size'
+            String condition,
+            Double minPrice,
+            Double maxPrice,
+            String type,
+            String sort,
+            Double latitude,
+            Double longitude,
+            Double radiusKm,
+            int page,
+            int sizePerPage) {
+
+        log.info("[Search] Location params - lat: {}, lng: {}, radius: {}km", latitude, longitude, radiusKm);
+        log.info("[Search] Filter params - query: {}, brand: {}, category: {}, type: {}",
+                query, brand, category, type);
+
+        Sort sortObj = toSort(sort);
+        var pageRequest = PageRequest.of(page, sizePerPage, sortObj);
+
+        // Base specification: not deleted, active, has stock
+        // ✅ REMOVED: .and(ProductSpecifications.isForSale()) - was blocking rent items
+        Specification<Product> spec = Specification
+                .where(ProductSpecifications.isNotDeleted())
+                .and(ProductSpecifications.hasStatus(ProductStatus.ACTIVE))
+                .and(ProductSpecifications.hasQuantityGreaterThan(0));
+
+        // ✅ LOCATION FILTER - Apply only if latitude and longitude provided
+        if (latitude != null && longitude != null) {
+            log.info("[Search] Applying location filter with radius: {}km", radiusKm != null ? radiusKm : 20);
+            double effectiveRadius = radiusKm != null ? radiusKm : 20.0;
+            spec = spec.and(ProductSpecifications.withinRadius(latitude, longitude, effectiveRadius));
+        } else {
+            log.info("[Search] No location provided, skipping location filter");
+        }
+
+        // ✅ FIXED: TYPE FILTER - Now handles rent/buy/both correctly
+        if (type != null && !type.trim().isEmpty()) {
+            log.info("[Search] Applying type filter: {}", type);
+
+            if (type.equalsIgnoreCase("rent")) {
+                // RENT ONLY: forRent=true
+                spec = spec.and((root, queryObj, cb) -> cb.isTrue(root.get("forRent")));
+            } else if (type.equalsIgnoreCase("buy")) {
+                // BUY ONLY: forSale=true
+                spec = spec.and((root, queryObj, cb) -> cb.isTrue(root.get("forSale")));
+            } else if (type.equalsIgnoreCase("both")) {
+                // BOTH: forRent=true OR forSale=true
+                spec = spec.and((root, queryObj, cb) -> cb.or(
+                        cb.isTrue(root.get("forRent")),
+                        cb.isTrue(root.get("forSale"))));
+            }
+
+            // Price range specific to rent/buy
+            if (minPrice != null || maxPrice != null) {
+                spec = spec.and(ProductSpecifications.hasPriceBetween(minPrice, maxPrice, type));
+            }
+        } else {
+            // ✅ NO TYPE SPECIFIED: Show both rent and buy items
+            spec = spec.and((root, queryObj, cb) -> cb.or(
+                    cb.isTrue(root.get("forRent")),
+                    cb.isTrue(root.get("forSale"))));
+
+            // Apply generic price range
+            if (minPrice != null || maxPrice != null) {
+                spec = spec.and(ProductSpecifications.hasPriceBetween(minPrice, maxPrice, null));
+            }
+        }
+
+        // KEYWORD SEARCH
+        if (query != null && !query.trim().isEmpty()) {
+            log.info("[Search] Applying keyword filter: {}", query);
+            spec = spec.and(ProductSpecifications.hasKeyword(query));
+        }
+
+        // BRAND FILTER
+        if (brand != null && !brand.trim().isEmpty()) {
+            log.info("[Search] Applying brand filter: {}", brand);
+            spec = spec.and(ProductSpecifications.hasBrand(brand));
+        }
+
+        // CATEGORY FILTER
+        if (category != null && !category.trim().isEmpty()) {
+            log.info("[Search] Applying category filter: {}", category);
+            spec = spec.and(ProductSpecifications.hasCategory(category));
+        }
+
+        // SIZE FILTER
+        if (itemSize != null && !itemSize.trim().isEmpty()) {
+            // ✅ EXTRA SAFETY: Validate size filter on backend
+            String trimmedSize = itemSize.trim().toLowerCase();
+            if (!trimmedSize.matches("(?i)xs|s|m|l|xl")) {
+                log.warn("[Search] Invalid size filter received: {} - ignoring", itemSize);
+                itemSize = null; // Ignore invalid size
+            } else {
+                log.info("[Search] Applying size filter: {}", trimmedSize);
+                spec = spec.and(ProductSpecifications.hasSize(trimmedSize));
+            }
+        }
+
+        // CONDITION FILTER
+        if (condition != null && !condition.trim().isEmpty()) {
+            log.info("[Search] Applying condition filter: {}", condition);
+            spec = spec.and(ProductSpecifications.hasCondition(condition));
+        }
+
+        // ✅ DEBUG LOGS: Log final filters applied
+        log.info(
+                "[Search] FINAL FILTERS APPLIED: query={}, brand={}, category={}, itemSize={}, condition={}, type={}, minPrice={}, maxPrice={}, location={}",
+                query != null && !query.trim().isEmpty() ? query : "none",
+                brand != null && !brand.trim().isEmpty() ? brand : "none",
+                category != null && !category.trim().isEmpty() ? category : "none",
+                itemSize != null && !itemSize.trim().isEmpty() ? itemSize : "none",
+                condition != null && !condition.trim().isEmpty() ? condition : "none",
+                type != null && !type.trim().isEmpty() ? type : "none",
+                minPrice != null ? minPrice : "none",
+                maxPrice != null ? maxPrice : "none",
+                (latitude != null && longitude != null)
+                        ? String.format("%.4f,%.4f (radius: %s)", latitude, longitude, radiusKm)
+                        : "none");
+
+        // ✅ FINAL DEBUG CHECK: Log the actual itemSize value being used
+        log.info("[Search] FINAL itemSize USED: {}", itemSize);
+
+        var pg = productRepository.findAll(spec, pageRequest);
+        List<ProductDTO> content = pg.getContent().stream()
+                .map(product -> {
+                    ProductDTO dto = toDto(product);
+                    // If location params provided, calculate distance
+                    if (latitude != null && longitude != null) {
+                        double distance = calculateDistance(latitude, longitude, product.getLatitude(),
+                                product.getLongitude());
+                        dto.setDistance(distance);
+                    }
+                    return dto;
+                })
+                .collect(Collectors.toList());
+
+        return new PageImpl<>(content, pg.getPageable(), pg.getTotalElements());
+    }
+
     private ProductDTO toDto(Product p) {
         ProductDTO dto = new ProductDTO();
         dto.setId(p.getId());
@@ -370,7 +558,7 @@ public class ProductServiceImpl implements ProductService {
         dto.setCondition(p.getProductCondition());
         dto.setProductType(p.getProductType());
         dto.setSalePrice(p.getSalePrice());
-        dto.setRentPricePerDay(p.getRentPricePerDay());
+        dto.setRentPrice(p.getRentPrice());
         dto.setBuyPrice(firstNonNull(p.getBuyPrice(), p.getSalePrice()));
         dto.setPopularity(p.getPopularity());
         // Use entity fields directly instead of helper methods

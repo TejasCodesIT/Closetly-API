@@ -22,7 +22,7 @@ public class ProductRequestDTO {
     private String condition;
 
     private Double salePrice;
-    private Double rentPricePerDay;
+    private Double rentPrice;
     private Double buyPrice;
 
     private ProductType productType;
@@ -60,7 +60,7 @@ public class ProductRequestDTO {
         log.debug("[ProductRequestDTO Deserialization]   isForRent: {} (type: boolean)", isForRent);
         log.debug("[ProductRequestDTO Deserialization]   productType: {}", productType);
         log.debug("[ProductRequestDTO Deserialization]   salePrice: {}", salePrice);
-        log.debug("[ProductRequestDTO Deserialization]   rentPricePerDay: {}", rentPricePerDay);
+        log.debug("[ProductRequestDTO Deserialization]   rentPrice: {}", rentPrice);
         log.debug("[ProductRequestDTO Deserialization]   description: '{}' (length: {})",
                 description, description != null ? description.length() : 0);
         log.debug("[ProductRequestDTO Deserialization]   images count: {}",
@@ -79,11 +79,11 @@ public class ProductRequestDTO {
             throw new IllegalArgumentException("salePrice is required and must be positive when isForSale is true");
         }
 
-        if (isForRent && (rentPricePerDay == null || rentPricePerDay <= 0)) {
-            log.error("[ProductRequestDTO Validation] isForRent is true but rentPricePerDay is invalid: {}",
-                    rentPricePerDay);
+        if (isForRent && (rentPrice == null || rentPrice <= 0)) {
+            log.error("[ProductRequestDTO Validation] isForRent is true but rentPrice is invalid: {}",
+                    rentPrice);
             throw new IllegalArgumentException(
-                    "rentPricePerDay is required and must be positive when isForRent is true");
+                    "rentPrice is required and must be positive when isForRent is true");
         }
 
         if (latitude == null || longitude == null) {
@@ -102,7 +102,7 @@ public class ProductRequestDTO {
         }
 
         log.debug(
-                "[ProductRequestDTO Validation] All validations passed - images: {}, salePrice: {}, rentPricePerDay: {}",
-                images.size(), salePrice, rentPricePerDay);
+                "[ProductRequestDTO Validation] All validations passed - images: {}, salePrice: {}, rentPrice: {}",
+                images.size(), salePrice, rentPrice);
     }
 }

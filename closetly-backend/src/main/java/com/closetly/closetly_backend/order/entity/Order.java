@@ -45,8 +45,10 @@ public class Order {
      * - mappedBy: indicates OrderItem.order is the owning side
      * - cascade: ALL orders are deleted/updated when their items are
      * - fetch: LAZY to prevent N+1 queries
+     * - @BatchSize: optimizes batch fetching to avoid N+1 queries
      */
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @org.hibernate.annotations.BatchSize(size = 10)
     @Builder.Default
     private List<OrderItem> orderItems = new ArrayList<>();
 
@@ -67,6 +69,9 @@ public class Order {
 
     public enum OrderStatus {
         PLACED,
+        PAID,
+        SHIPPED,
+        DELIVERED,
         APPROVED,
         REJECTED,
         CANCELLED

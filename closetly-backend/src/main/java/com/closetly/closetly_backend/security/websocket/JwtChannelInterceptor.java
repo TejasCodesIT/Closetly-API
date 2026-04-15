@@ -7,11 +7,14 @@ import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.*;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageBuilder;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 import org.springframework.lang.NonNull;
 
-import java.security.Principal;
+import java.util.Collections;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 @RequiredArgsConstructor
@@ -19,63 +22,106 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
 
     private final JwtTokenProvider tokenProvider;
 
-    
-@Override
-public Message<?> preSend(@NonNull Message<?> message, @NonNull MessageChannel channel) {
+    // ✅ Static map to store auth by session ID
+    private static final ConcurrentHashMap<String, UsernamePasswordAuthenticationToken> authStore = new ConcurrentHashMap<>();
 
-    StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
+    @Override
+    public Message<?> preSend(@NonNull Message<?> message, @NonNull MessageChannel channel) {
 
-    System.out.println("🔥 COMMAND: " + accessor.getCommand());
-    System.out.println("🔥 USER BEFORE: " + accessor.getUser());
+        StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
 
-    if (accessor.getCommand() == null) {
-        return message;
-    }
+        System.out.println("🔥 COMMAND: " + accessor.getCommand());
+        System.out.println("🔥 USER BEFORE: " + (accessor.getUser() != null ? accessor.getUser().getName() : "null"));
 
-    // ✅ If already present → just continue
-    if (accessor.getUser() != null) {
-        return message;
-    }
-
-    // ✅ CONNECT → authenticate
-    if (StompCommand.CONNECT.equals(accessor.getCommand())) {
-
-        String rawAuthorization = Optional.ofNullable(accessor.getFirstNativeHeader("Authorization"))
-                .orElse(accessor.getFirstNativeHeader("authorization"));
-
-        if (rawAuthorization == null || !rawAuthorization.startsWith("Bearer ")) {
-            throw new RuntimeException("Missing Authorization header");
+        if (accessor.getCommand() == null) {
+            return message;
         }
 
-        String token = rawAuthorization.substring(7);
-
-        if (!tokenProvider.validateToken(token)) {
-            throw new RuntimeException("Invalid JWT token");
+        // ✅ If already authenticated → continue
+        if (accessor.getUser() != null) {
+            return message;
         }
 
-        String username = tokenProvider.getUsernameFromJWT(token);
+        // ✅ CONNECT → authenticate and store token
+        if (StompCommand.CONNECT.equals(accessor.getCommand())) {
 
-        Principal user = () -> username;
+            String rawAuthorization = Optional.ofNullable(accessor.getFirstNativeHeader("Authorization"))
+                    .orElse(accessor.getFirstNativeHeader("authorization"));
 
-        accessor.setUser(user);
+            if (rawAuthorization == null || !rawAuthorization.startsWith("Bearer ")) {
+                System.out.println("❌ Missing Authorization header");
+                throw new RuntimeException("Missing Authorization header");
+            }
 
-        // ✅ STORE IN SESSION
-        accessor.getSessionAttributes().put("user", user);
+            String token = rawAuthorization.substring(7);
 
-        System.out.println("✅ WS CONNECT user = " + username);
-    }
+            if (!tokenProvider.validateToken(token)) {
+                System.out.println("❌ Invalid JWT token");
+                throw new RuntimeException("Invalid JWT token");
+            }
 
-    // ✅ SEND → restore user
-    else {
-        Principal user = (Principal) accessor.getSessionAttributes().get("user");
+            String username = tokenProvider.getUsernameFromJWT(token);
 
-        if (user != null) {
-            accessor.setUser(user);
-            System.out.println("🔁 USER RESTORED: " + user.getName());
+            // ✅ Create proper Authentication object
+            UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(username, null,
+                    Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")));
+
+            accessor.setUser(auth);
+
+            // ✅ Store in static map by session ID
+            String sessionId = accessor.getSessionId();
+            if (sessionId != null) {
+                authStore.put(sessionId, auth);
+                System.out.println("✅ STORED AUTH for session: " + sessionId);
+            }
+
+            // ✅ Also store in session attributes as backup
+            accessor.getSessionAttributes().put("jwt_token", token);
+            accessor.getSessionAttributes().put("auth_user", auth);
+
+            System.out.println("✅ WS CONNECT user = " + username);
         }
-    }
 
-    // 💥 CRITICAL LINE (THIS FIXES YOUR ISSUE)
-    return MessageBuilder.createMessage(message.getPayload(), accessor.getMessageHeaders());
-}
+        // ✅ SEND/SUBSCRIBE → restore from static map
+        else if (StompCommand.SEND.equals(accessor.getCommand()) ||
+                StompCommand.SUBSCRIBE.equals(accessor.getCommand()) ||
+                StompCommand.UNSUBSCRIBE.equals(accessor.getCommand())) {
+
+            String sessionId = accessor.getSessionId();
+            System.out.println("🔍 LOOKING FOR AUTH - Session ID: " + sessionId);
+
+            UsernamePasswordAuthenticationToken auth = null;
+
+            // ✅ Try static map first
+            if (sessionId != null) {
+                auth = authStore.get(sessionId);
+                System.out.println("🔍 FOUND IN STATIC MAP: " + (auth != null ? auth.getName() : "null"));
+            }
+
+            // ✅ Fallback to session attributes
+            if (auth == null) {
+                auth = (UsernamePasswordAuthenticationToken) accessor.getSessionAttributes().get("auth_user");
+                System.out.println("🔍 FOUND IN SESSION ATTRS: " + (auth != null ? auth.getName() : "null"));
+            }
+
+            if (auth != null) {
+                accessor.setUser(auth);
+                System.out.println("🔁 USER RESTORED: " + auth.getName());
+            } else {
+                System.out.println("❌ No auth found for " + accessor.getCommand());
+                throw new RuntimeException("Authentication required");
+            }
+        }
+
+        // ✅ DISCONNECT → cleanup
+        else if (StompCommand.DISCONNECT.equals(accessor.getCommand())) {
+            String sessionId = accessor.getSessionId();
+            if (sessionId != null) {
+                authStore.remove(sessionId);
+                System.out.println("🧹 CLEANED UP AUTH for session: " + sessionId);
+            }
+        }
+
+        return MessageBuilder.createMessage(message.getPayload(), accessor.getMessageHeaders());
+    }
 }

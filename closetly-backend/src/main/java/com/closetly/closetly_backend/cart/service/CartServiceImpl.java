@@ -210,9 +210,9 @@ public class CartServiceImpl implements CartService {
     }
 
     private double calculateItemTotal(CartItemDTO item) {
-        if (item.getType() == CartItemDTO.CartItemType.RENT && item.getProduct().getRentPricePerDay() != null) {
+        if (item.getType() == CartItemDTO.CartItemType.RENT && item.getProduct().getRentPrice() != null) {
             long days = java.time.temporal.ChronoUnit.DAYS.between(item.getStartDate(), item.getEndDate()) + 1;
-            return item.getProduct().getRentPricePerDay() * days * item.getQuantity();
+            return item.getProduct().getRentPrice() * days * item.getQuantity();
         } else if (item.getType() == CartItemDTO.CartItemType.BUY && item.getProduct().getSalePrice() != null) {
             return item.getProduct().getSalePrice() * item.getQuantity();
         }
@@ -231,7 +231,7 @@ public class CartServiceImpl implements CartService {
         productDto.setCondition(product.getProductCondition());
         productDto.setProductType(product.getProductType());
         productDto.setSalePrice(product.getSalePrice());
-        productDto.setRentPricePerDay(product.getRentPricePerDay());
+        productDto.setRentPrice(product.getRentPrice());
         productDto.setBuyPrice(product.getBuyPrice());
         productDto.setPopularity(product.getPopularity());
         productDto.setForSale(product.allowsBuy());

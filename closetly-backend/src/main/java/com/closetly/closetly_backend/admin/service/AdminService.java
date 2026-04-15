@@ -133,7 +133,7 @@ public class AdminService {
                 .title(product.getTitle())
                 .description(product.getDescription())
                 .price(product.getSalePrice() != null ? BigDecimal.valueOf(product.getSalePrice())
-                        : (product.getRentPricePerDay() != null ? BigDecimal.valueOf(product.getRentPricePerDay())
+                        : (product.getRentPrice() != null ? BigDecimal.valueOf(product.getRentPrice())
                                 : (product.getBuyPrice() != null ? BigDecimal.valueOf(product.getBuyPrice())
                                         : BigDecimal.ZERO)))
                 .condition(product.getProductCondition())
@@ -146,10 +146,10 @@ public class AdminService {
     private BookingDTO mapToBookingDTO(Booking booking) {
         // Calculate total price for rentals: rentPricePerDay * number of days
         BigDecimal totalPrice = null;
-        if (booking.getProduct().getRentPricePerDay() != null && booking.getStartDate() != null
+        if (booking.getProduct().getRentPrice() != null && booking.getStartDate() != null
                 && booking.getEndDate() != null) {
             long days = java.time.temporal.ChronoUnit.DAYS.between(booking.getStartDate(), booking.getEndDate()) + 1; // inclusive
-            totalPrice = BigDecimal.valueOf(booking.getProduct().getRentPricePerDay() * days);
+            totalPrice = BigDecimal.valueOf(booking.getProduct().getRentPrice() * days);
         }
 
         return BookingDTO.builder()

@@ -111,7 +111,7 @@ public class WishlistServiceImpl implements WishlistService {
         dto.setProductDescription(wishlist.getProduct().getDescription());
         dto.setProductBrand(wishlist.getProduct().getBrand());
         dto.setProductSalePrice(wishlist.getProduct().getSalePrice());
-        dto.setProductRentPricePerDay(wishlist.getProduct().getRentPricePerDay());
+        dto.setProductRentPricePerDay(wishlist.getProduct().getRentPrice());
         dto.setProductImages(wishlist.getProduct().getImages());
         dto.setAddedAt(wishlist.getCreatedAt());
         return dto;

@@ -72,8 +72,8 @@ public class CartItem {
 
     // Helper method to calculate item total
     public double getItemTotal() {
-        if (type == CartItemType.RENT && product.getRentPricePerDay() != null) {
-            return product.getRentPricePerDay() * getRentalDays() * quantity;
+        if (type == CartItemType.RENT && product.getRentPrice() != null) {
+            return product.getRentPrice() * getRentalDays() * quantity;
         } else if (type == CartItemType.BUY && product.getSalePrice() != null) {
             return product.getSalePrice() * quantity;
         }

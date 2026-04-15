@@ -5,6 +5,8 @@ import com.closetly.closetly_backend.order.entity.Order;
 import com.closetly.closetly_backend.order.entity.Order.OrderStatus;
 import com.closetly.closetly_backend.order.entity.OrderItem;
 import com.closetly.closetly_backend.order.entity.OrderItem.OrderItemType;
+import com.closetly.closetly_backend.chat.entity.ChatRoom;
+import com.closetly.closetly_backend.chat.repository.ChatRoomRepository;
 import com.closetly.closetly_backend.order.repository.OrderItemRepository;
 import com.closetly.closetly_backend.order.repository.OrderRepository;
 import com.closetly.closetly_backend.product.entity.Product;
@@ -15,13 +17,18 @@ import com.closetly.closetly_backend.cart.entity.CartItem;
 import com.closetly.closetly_backend.cart.repository.CartItemRepository;
 import com.closetly.closetly_backend.cart.entity.CartItem.CartItemType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -34,6 +41,18 @@ public class OrderServiceImpl implements OrderService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final CartItemRepository cartItemRepository;
+    private final ChatRoomRepository chatRoomRepository;
+
+    /**
+     * Validates and sets default status for orders
+     */
+    private void validateAndSetOrderStatus(Order order) {
+        if (order.getStatus() == null) {
+            order.setStatus(OrderStatus.PLACED);
+        }
+        // Debug logging
+        System.out.println("Saving Order with status: " + order.getStatus());
+    }
 
     @Override
     @Transactional
@@ -86,7 +105,12 @@ public class OrderServiceImpl implements OrderService {
 
         orderItem.setOrder(order);
 
+        // Validate and set status with debug logging
+        validateAndSetOrderStatus(order);
+
         Order saved = orderRepository.save(order);
+        System.out.println("Order saved (legacy one-item): " + saved.getId() + " status=" + saved.getStatus()
+                + " customer=" + saved.getCustomer().getId() + " seller=" + saved.getSeller().getId());
         return toLegacyDto(saved);
     }
 
@@ -180,6 +204,9 @@ public class OrderServiceImpl implements OrderService {
         // Set bidirectional relationship
         orderItems.forEach(item -> item.setOrder(order));
 
+        // Validate and set status with debug logging
+        validateAndSetOrderStatus(order);
+
         // Update product quantities for BUY items
         for (OrderItem item : orderItems) {
             if (item.getType() == OrderItemType.BUY) {
@@ -192,12 +219,14 @@ public class OrderServiceImpl implements OrderService {
         }
 
         Order saved = orderRepository.save(order);
+        System.out.println("Order saved: " + saved.getId() + " status=" + saved.getStatus() + " customer="
+                + saved.getCustomer().getId() + " seller=" + saved.getSeller().getId());
         return toDto(saved);
     }
 
     @Override
     @Transactional
-    public OrderDTO placeOrder(String email) {
+    public List<OrderDTO> placeOrder(String email) {
         // 1. Validate and get customer
         User customer = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("Customer not found"));
@@ -211,8 +240,21 @@ public class OrderServiceImpl implements OrderService {
             throw new IllegalStateException("Cart is empty. Add items to cart before placing order.");
         }
 
-        // 4. Extract product IDs and fetch all products in a single batch query
-        // (prevents N+1 queries)
+        System.out.println("==== CART ITEMS DEBUG ====");
+        cartItems.forEach(item -> {
+            System.out.println(
+                    "Product: " + item.getProduct().getId() +
+                            " | Seller: " + item.getProduct().getSeller().getId());
+        });
+
+        // 4. Group cart items by seller
+        Map<Long, List<CartItem>> itemsBySeller = cartItems.stream()
+                .collect(Collectors.groupingBy(item -> {
+                    Long sellerId = item.getProduct().getSeller().getId();
+                    System.out.println("Grouping Seller ID: " + sellerId);
+                    return sellerId;
+                }));
+        // 5. Extract product IDs and fetch all products in a single batch query
         List<Long> productIds = cartItems.stream()
                 .map(cartItem -> cartItem.getProduct().getId())
                 .distinct()
@@ -222,134 +264,134 @@ public class OrderServiceImpl implements OrderService {
         Map<Long, Product> productMap = products.stream()
                 .collect(Collectors.toMap(Product::getId, Function.identity()));
 
-        // 5. Calculate total amount and validate cart items
-        double totalAmount = 0.0;
-        int totalItems = 0;
+        // 6. Create separate orders for each seller
+        List<Order> orders = new ArrayList<>();
 
-        // Validate all cart items and calculate totals
-        for (CartItem cartItem : cartItems) {
-            Product product = productMap.get(cartItem.getProduct().getId());
-            if (product == null) {
-                throw new IllegalArgumentException("Product not found: " + cartItem.getProduct().getId());
-            }
+        for (Map.Entry<Long, List<CartItem>> entry : itemsBySeller.entrySet()) {
+            Long sellerId = entry.getKey();
+            List<CartItem> sellerCartItems = entry.getValue();
 
-            // Check ownership - can't order own products
-            if (product.getSeller().getId().equals(customer.getId())) {
-                throw new IllegalStateException("You cannot order your own product: " + product.getTitle());
-            }
+            // Get seller
+            User seller = sellerCartItems.get(0).getProduct().getSeller();
 
-            // Calculate item total based on type
-            double itemTotal;
-            if (cartItem.getType() == CartItemType.BUY) {
-                // Validate product is available for purchase
-                if (!product.allowsBuy()) {
-                    throw new IllegalArgumentException("Product is not available for purchase: " + product.getTitle());
-                }
-                // Use salePrice for buying
-                Double salePrice = product.getSalePrice();
-                if (salePrice == null || salePrice <= 0) {
-                    throw new IllegalArgumentException("Invalid sale price for product: " + product.getTitle());
-                }
-                itemTotal = salePrice * cartItem.getQuantity();
+            // Calculate totals for this seller's items
+            double sellerTotalAmount = 0.0;
+            int sellerTotalItems = 0;
+            List<OrderItem> orderItems = new ArrayList<>();
 
-            } else if (cartItem.getType() == CartItemType.RENT) {
-                // Validate product is available for rent
-                if (!product.allowsRent()) {
-                    throw new IllegalArgumentException("Product is not available for rent: " + product.getTitle());
-                }
-                // Validate rental dates
-                if (cartItem.getStartDate() == null || cartItem.getEndDate() == null) {
-                    throw new IllegalArgumentException("Rental dates are required for rental items");
-                }
-                validateRentalDates(cartItem.getStartDate(), cartItem.getEndDate());
-
-                // Use rentPricePerDay for renting
-                Double rentPricePerDay = product.getRentPricePerDay();
-                if (rentPricePerDay == null || rentPricePerDay <= 0) {
-                    throw new IllegalArgumentException("Invalid rental price for product: " + product.getTitle());
+            // Validate and create order items for this seller
+            for (CartItem cartItem : sellerCartItems) {
+                Product product = productMap.get(cartItem.getProduct().getId());
+                if (product == null) {
+                    throw new IllegalArgumentException("Product not found: " + cartItem.getProduct().getId());
                 }
 
-                // Calculate rental days (inclusive)
-                long rentalDays = java.time.temporal.ChronoUnit.DAYS.between(cartItem.getStartDate(),
-                        cartItem.getEndDate()) + 1;
-                itemTotal = rentPricePerDay * rentalDays * cartItem.getQuantity();
+                // Check ownership - can't order own products
+                if (product.getSeller().getId().equals(customer.getId())) {
+                    throw new IllegalStateException("You cannot order your own product: " + product.getTitle());
+                }
 
-            } else {
-                throw new IllegalArgumentException("Invalid cart item type: " + cartItem.getType());
-            }
+                // Calculate item total based on type
+                double itemTotal;
+                Integer rentalDays = null;
 
-            totalAmount += itemTotal;
-            totalItems += cartItem.getQuantity();
-        }
+                if (cartItem.getType() == CartItemType.BUY) {
+                    // Validate product is available for purchase
+                    if (!product.allowsBuy()) {
+                        throw new IllegalArgumentException(
+                                "Product is not available for purchase: " + product.getTitle());
+                    }
+                    // Use salePrice for buying
+                    Double salePrice = product.getSalePrice();
+                    if (salePrice == null || salePrice <= 0) {
+                        throw new IllegalArgumentException("Invalid sale price for product: " + product.getTitle());
+                    }
+                    itemTotal = salePrice * cartItem.getQuantity();
+                } else if (cartItem.getType() == CartItemType.RENT) {
+                    // Validate product is available for rent
+                    if (!product.allowsRent()) {
+                        throw new IllegalArgumentException("Product is not available for rent: " + product.getTitle());
+                    }
+                    // Validate rental dates
+                    if (cartItem.getStartDate() == null || cartItem.getEndDate() == null) {
+                        throw new IllegalArgumentException("Rental dates are required for rental items");
+                    }
+                    validateRentalDates(cartItem.getStartDate(), cartItem.getEndDate());
 
-        // 6. Create OrderItems from CartItems
-        List<OrderItem> orderItems = cartItems.stream()
-                .map(cartItem -> {
-                    Product product = productMap.get(cartItem.getProduct().getId());
-
-                    // Recalculate unit price and total for this order item
-                    double unitPrice;
-                    Integer rentalDays = null;
-
-                    if (cartItem.getType() == CartItemType.BUY) {
-                        unitPrice = product.getSalePrice();
-                    } else {
-                        unitPrice = product.getRentPricePerDay();
-                        rentalDays = (int) (java.time.temporal.ChronoUnit.DAYS.between(cartItem.getStartDate(),
-                                cartItem.getEndDate()) + 1);
+                    // Use rentPrice for renting
+                    Double rentPrice = product.getRentPrice();
+                    if (rentPrice == null || rentPrice <= 0) {
+                        throw new IllegalArgumentException("Invalid rental price for product: " + product.getTitle());
                     }
 
-                    double totalPrice = unitPrice * cartItem.getQuantity();
-                    if (cartItem.getType() == CartItemType.RENT) {
-                        totalPrice = unitPrice * rentalDays * cartItem.getQuantity();
-                    }
-
-                    return OrderItem.builder()
-                            .product(product)
-                            .quantity(cartItem.getQuantity())
-                            .unitPrice(unitPrice)
-                            .totalPrice(totalPrice)
-                            .type(cartItem.getType() == CartItemType.BUY ? OrderItemType.BUY : OrderItemType.RENT)
-                            .startDate(cartItem.getStartDate())
-                            .endDate(cartItem.getEndDate())
-                            .rentalDays(rentalDays)
-                            .build();
-                })
-                .toList();
-
-        // 7. Create the Order with calculated totals
-        Order order = Order.builder()
-                .customer(customer)
-                .seller(orderItems.get(0).getProduct().getSeller()) // Assume all items from same seller
-                .orderItems(orderItems)
-                .totalAmount(totalAmount)
-                .totalItems(totalItems)
-                .status(OrderStatus.PLACED)
-                .build();
-
-        // Set bidirectional relationship
-        orderItems.forEach(item -> item.setOrder(order));
-
-        // 8. Update product quantities for BUY items (decrement stock)
-        for (OrderItem item : orderItems) {
-            if (item.getType() == OrderItemType.BUY) {
-                Product product = item.getProduct();
-                Integer currentQty = product.getQuantity();
-                if (currentQty != null && currentQty >= item.getQuantity()) {
-                    product.setQuantity(currentQty - item.getQuantity());
+                    // Calculate rental days (inclusive)
+                    rentalDays = (int) (ChronoUnit.DAYS.between(cartItem.getStartDate(), cartItem.getEndDate()) + 1);
+                    itemTotal = rentPrice * rentalDays * cartItem.getQuantity();
                 } else {
-                    throw new IllegalStateException("Insufficient stock for product: " + product.getTitle());
+                    throw new IllegalArgumentException("Invalid cart item type: " + cartItem.getType());
+                }
+
+                sellerTotalAmount += itemTotal;
+                sellerTotalItems += cartItem.getQuantity();
+
+                // Create OrderItem
+                OrderItem orderItem = OrderItem.builder()
+                        .product(product)
+                        .quantity(cartItem.getQuantity())
+                        .unitPrice(cartItem.getType() == CartItemType.BUY ? product.getSalePrice()
+                                : product.getRentPrice())
+                        .totalPrice(itemTotal)
+                        .type(cartItem.getType() == CartItemType.BUY ? OrderItemType.BUY : OrderItemType.RENT)
+                        .startDate(cartItem.getStartDate())
+                        .endDate(cartItem.getEndDate())
+                        .rentalDays(rentalDays)
+                        .build();
+
+                orderItems.add(orderItem);
+            }
+
+            // Create the Order for this seller
+            Order order = Order.builder()
+                    .customer(customer)
+                    .seller(seller)
+                    .orderItems(orderItems)
+                    .totalAmount(sellerTotalAmount)
+                    .totalItems(sellerTotalItems)
+                    .status(OrderStatus.PLACED)
+                    .build();
+
+            // Set bidirectional relationship
+            orderItems.forEach(item -> item.setOrder(order));
+
+            // Validate and set status with debug logging
+            validateAndSetOrderStatus(order);
+
+            // Update product quantities for BUY items (decrement stock)
+            for (OrderItem item : orderItems) {
+                if (item.getType() == OrderItemType.BUY) {
+                    Product product = item.getProduct();
+                    Integer currentQty = product.getQuantity();
+                    if (currentQty != null && currentQty >= item.getQuantity()) {
+                        product.setQuantity(currentQty - item.getQuantity());
+                    } else {
+                        throw new IllegalStateException("Insufficient stock for product: " + product.getTitle());
+                    }
                 }
             }
+
+            // Save the order (cascade will save order items)
+            Order savedOrder = orderRepository.save(order);
+            System.out.println("Order saved (checkout): " + savedOrder.getId() + " status=" + savedOrder.getStatus()
+                    + " customer=" + savedOrder.getCustomer().getId() + " seller=" + savedOrder.getSeller().getId());
+
+            orders.add(savedOrder);
         }
 
-        // 9. Save the order (cascade will save order items)
-        Order savedOrder = orderRepository.save(order);
-
-        // 10. Clear the cart after successful order creation
+        // 7. Clear the cart after successful order creation
         cartItemRepository.deleteByUserId(customer.getId());
 
-        return toDto(savedOrder);
+        // 8. Return list of order DTOs
+        return orders.stream().map(this::toDto).toList();
     }
 
     @Override
@@ -359,6 +401,60 @@ public class OrderServiceImpl implements OrderService {
 
         List<Order> orders = orderRepository.findByCustomerIdWithItemsAndProducts(customer.getId());
         return orders.stream().map(this::toDto).toList();
+    }
+
+    @Override
+    public Page<OrderDTO> getCustomerOrders(String email, int page, int size) {
+        User customer = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Customer not found"));
+
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.max(size, 1));
+        Page<Order> ordersPage = orderRepository.findByCustomerIdOrderByCreatedAtDesc(customer.getId(), pageable);
+        return ordersPage.map(this::toDto);
+    }
+
+    @Override
+    public Page<SellerOrderItemDTO> getSellerOrderItems(String email, int page, int size) {
+
+        User seller = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Seller not found"));
+
+        Pageable pageable = PageRequest.of(page, size);
+
+        Page<OrderItem> itemsPage = orderItemRepository.findBySellerIdWithDetails(seller.getId(), pageable);
+
+        return itemsPage.map(this::toSellerOrderItemDto);
+    }
+
+    @Override
+    public Page<OrderDTO> getOrderRequests(String email, int page, int size) {
+        User seller = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Seller not found"));
+
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.max(size, 1));
+        Page<Order> ordersPage = orderRepository.findBySellerIdAndStatusInOrderByCreatedAtDesc(
+                seller.getId(), List.of(OrderStatus.PLACED), pageable);
+        return ordersPage.map(this::toDto);
+    }
+
+    @Override
+    public Page<OrderDTO> getOrderHistory(String email, boolean sellerSide, int page, int size) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        List<OrderStatus> historyStatuses = List.of(OrderStatus.PAID, OrderStatus.SHIPPED, OrderStatus.DELIVERED);
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.max(size, 1));
+
+        Page<Order> ordersPage;
+        if (sellerSide) {
+            ordersPage = orderRepository.findBySellerIdAndStatusInOrderByCreatedAtDesc(user.getId(), historyStatuses,
+                    pageable);
+        } else {
+            ordersPage = orderRepository.findByCustomerIdAndStatusInOrderByCreatedAtDesc(user.getId(), historyStatuses,
+                    pageable);
+        }
+
+        return ordersPage.map(this::toDto);
     }
 
     @Override
@@ -378,10 +474,10 @@ public class OrderServiceImpl implements OrderService {
 
     private double calculateUnitPrice(Product product, OrderItemType type, LocalDate startDate, LocalDate endDate) {
         if (type == OrderItemType.RENT) {
-            if (product.getRentPricePerDay() == null) {
+            if (product.getRentPrice() == null) {
                 throw new IllegalArgumentException("Rental price not set for product: " + product.getTitle());
             }
-            return product.getRentPricePerDay();
+            return product.getRentPrice();
         } else {
             Double price = firstNonNull(product.getBuyPrice(), product.getSalePrice());
             if (price == null) {
@@ -502,13 +598,88 @@ public class OrderServiceImpl implements OrderService {
             throw new IllegalStateException("Order can only be approved if it's in PLACED status");
         }
 
+        // Get the first product from the order (assuming single product orders for now)
+        Product product = order.getOrderItems().get(0).getProduct();
+        int orderedQuantity = order.getOrderItems().get(0).getQuantity();
+
+        // STEP 1 & 2: Fetch product with pessimistic lock and check quantity
+        Product lockedProduct = productRepository.findByIdForUpdate(product.getId());
+        if (lockedProduct == null) {
+            throw new IllegalArgumentException("Product not found");
+        }
+
+        if (lockedProduct.getQuantity() == null || lockedProduct.getQuantity() <= 0) {
+            // STEP 2: Reject this order if no quantity available
+            order.setStatus(OrderStatus.REJECTED);
+            orderRepository.save(order);
+            throw new IllegalStateException("Product already sold");
+        }
+
+        // STEP 3: Reduce product quantity
+        int newQuantity = lockedProduct.getQuantity() - orderedQuantity;
+        lockedProduct.setQuantity(newQuantity);
+
+        // STEP 4: If quantity becomes 0, set forSale = false
+        if (newQuantity <= 0) {
+            lockedProduct.setForSale(false);
+        }
+
+        // STEP 5: Save product and order
+        productRepository.save(lockedProduct);
         order.setStatus(OrderStatus.APPROVED);
         Order saved = orderRepository.save(order);
 
-        // TODO: Send notification to customer
-        // TODO: Create chat room automatically
+        // STEP 6: Reject all other PLACED orders for the same product
+        List<Order> otherPlacedOrders = orderRepository.findByProductIdAndStatusAndIdNot(
+                product.getId(), OrderStatus.PLACED, orderId);
+
+        for (Order otherOrder : otherPlacedOrders) {
+            otherOrder.setStatus(OrderStatus.REJECTED);
+            orderRepository.save(otherOrder);
+        }
+
+        // Create chat room (fixed to avoid duplicates)
+        createChatRoomForOrder(saved);
 
         return toDto(saved);
+    }
+
+    private void createChatRoomForOrder(Order order) {
+        if (order == null || order.getId() == null) {
+            return;
+        }
+
+        Optional<ChatRoom> existingRoom = chatRoomRepository.findByOrderId(order.getId());
+        if (existingRoom.isPresent()) {
+            ChatRoom room = existingRoom.get();
+            if (room.isDeleted()) {
+                room.setDeleted(false);
+                chatRoomRepository.saveAndFlush(room);
+            }
+            return;
+        }
+
+        Optional<ChatRoom> deletedRoom = chatRoomRepository.findByOrderIdIncludeDeleted(order.getId());
+        if (deletedRoom.isPresent()) {
+            ChatRoom room = deletedRoom.get();
+            room.setDeleted(false);
+            chatRoomRepository.saveAndFlush(room);
+            return;
+        }
+
+        Long productId = order.getOrderItems().stream()
+                .filter(item -> item.getProduct() != null)
+                .map(item -> item.getProduct().getId())
+                .findFirst().orElse(null);
+
+        ChatRoom newRoom = ChatRoom.builder()
+                .order(order)
+                .productId(productId)
+                .buyerId(order.getCustomer().getId())
+                .sellerId(order.getSeller().getId())
+                .build();
+
+        chatRoomRepository.save(newRoom);
     }
 
     @Override
@@ -530,12 +701,93 @@ public class OrderServiceImpl implements OrderService {
             throw new IllegalStateException("Order can only be rejected if it's in PLACED status");
         }
 
-        order.setStatus(OrderStatus.REJECTED);
+        order.setStatus(OrderStatus.CANCELLED);
         Order saved = orderRepository.save(order);
 
         // TODO: Send notification to customer
         // TODO: Restore product quantities for BUY items
 
         return toDto(saved);
+    }
+
+    @Override
+    public List<SellerOrderItemDTO> getSellerOrderItems(String email) {
+        User seller = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Seller not found"));
+
+        List<OrderItem> orderItems = orderItemRepository.findBySellerIdWithOrderAndProductDetails(seller.getId());
+        return orderItems.stream().map(this::toSellerOrderItemDto).toList();
+    }
+
+    @Transactional
+    @Override
+    public SellerOrderItemDTO approveOrderItem(Long orderItemId, String email) {
+
+        OrderItem item = orderItemRepository.findById(orderItemId)
+                .orElseThrow(() -> new IllegalArgumentException("Item not found"));
+
+        if (item.getProduct().getQuantity() <= 0) {
+            throw new IllegalStateException("Product already sold");
+        }
+
+        item.getProduct().setQuantity(item.getProduct().getQuantity() - 1);
+
+        // Optional: mark item approved (you can add status field later)
+
+        orderItemRepository.save(item);
+
+        return toSellerOrderItemDto(item);
+    }
+
+    @Override
+    @Transactional
+    public SellerOrderItemDTO rejectOrderItem(Long orderItemId, String email) {
+        User seller = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Seller not found"));
+
+        OrderItem orderItem = orderItemRepository.findById(orderItemId)
+                .orElseThrow(() -> new IllegalArgumentException("Order item not found"));
+
+        // Verify seller owns this product
+        if (!orderItem.getProduct().getSeller().getId().equals(seller.getId())) {
+            throw new IllegalStateException("You can only reject order items for your own products");
+        }
+
+        // Can only reject PLACED orders
+        if (orderItem.getOrder().getStatus() != OrderStatus.PLACED) {
+            throw new IllegalStateException("Order item can only be rejected if the order is in PLACED status");
+        }
+
+        // Reject the entire order when any item is rejected
+        orderItem.getOrder().setStatus(OrderStatus.CANCELLED);
+        orderRepository.save(orderItem.getOrder());
+
+        return toSellerOrderItemDto(orderItem);
+    }
+
+    private SellerOrderItemDTO toSellerOrderItemDto(OrderItem orderItem) {
+        SellerOrderItemDTO dto = new SellerOrderItemDTO();
+        dto.setOrderItemId(orderItem.getId());
+        dto.setOrderId(orderItem.getOrder().getId());
+        dto.setProductId(orderItem.getProduct().getId());
+        dto.setProductName(orderItem.getProduct().getTitle());
+        dto.setProductBrand(orderItem.getProduct().getBrand());
+        dto.setImage(orderItem.getProduct().getImages() != null && !orderItem.getProduct().getImages().isEmpty()
+                ? orderItem.getProduct().getImages().get(0)
+                : null);
+        dto.setQuantity(orderItem.getQuantity());
+        dto.setPrice(orderItem.getTotalPrice());
+        dto.setType(orderItem.getType().toString());
+        dto.setOrderStatus(orderItem.getOrder().getStatus().toString());
+        dto.setCreatedAt(orderItem.getCreatedAt());
+        dto.setCustomerName(orderItem.getOrder().getCustomer().getFullName());
+        dto.setCustomerEmail(orderItem.getOrder().getCustomer().getEmail());
+        return dto;
+    }
+
+    @Override
+    public Page<OrderDTO> getSellerOrders(String email, int page, int size) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'getSellerOrders'");
     }
 }

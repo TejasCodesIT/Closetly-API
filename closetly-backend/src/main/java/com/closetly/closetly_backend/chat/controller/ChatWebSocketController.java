@@ -24,22 +24,24 @@ public class ChatWebSocketController {
     private final ChatService chatService;
     private final SimpMessagingTemplate messagingTemplate;
 
-   @MessageMapping("/chat/send")
-public void sendMessage(@Valid MessageDTO message, Principal principal) {
+    @MessageMapping("/chat/send")
+    public void sendMessage(@Valid MessageDTO message, Authentication authentication) {
 
-    if (principal == null || principal.getName() == null) {
-        throw new AccessDeniedException("Unauthorized");
+        if (authentication == null || !authentication.isAuthenticated()) {
+            System.out.println("❌ AUTHENTICATION IS NULL OR NOT AUTHENTICATED");
+            throw new AccessDeniedException("Unauthorized");
+        }
+
+        String username = authentication.getName();
+        System.out.println("🔥 AUTHENTICATION TYPE: " + authentication.getClass().getSimpleName());
+        System.out.println("🔥 AUTHENTICATION NAME: " + username);
+
+        log.info("🔥 FINAL USER: {}", username);
+
+        MessageDTO saved = chatService.sendMessage(message, username);
+
+        messagingTemplate.convertAndSend(
+                "/topic/chat/" + saved.getChatRoomId(),
+                saved);
     }
-
-    String username = principal.getName();
-
-    log.info("🔥 FINAL USER: {}", username);
-
-    MessageDTO saved = chatService.sendMessage(message, username);
-
-    messagingTemplate.convertAndSend(
-        "/topic/chat/" + saved.getChatRoomId(),
-        saved
-    );
-}
 }

@@ -2,6 +2,8 @@ package com.closetly.closetly_backend.order.repository;
 
 import com.closetly.closetly_backend.order.entity.Order;
 import com.closetly.closetly_backend.order.entity.Order.OrderStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -83,6 +85,16 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
         @EntityGraph(attributePaths = { "orderItems.product.images" })
         List<Order> findBySellerIdWithItemsAndProducts(@Param("sellerId") Long sellerId);
 
+        Page<Order> findByCustomerIdOrderByCreatedAtDesc(Long customerId, Pageable pageable);
+
+        Page<Order> findByCustomerIdAndStatusInOrderByCreatedAtDesc(Long customerId, Collection<OrderStatus> statuses,
+                        Pageable pageable);
+
+        Page<Order> findBySellerIdOrderByCreatedAtDesc(Long sellerId, Pageable pageable);
+
+        Page<Order> findBySellerIdAndStatusInOrderByCreatedAtDesc(Long sellerId, Collection<OrderStatus> statuses,
+                        Pageable pageable);
+
         /**
          * Find all orders with a specific status
          * Useful for order management (e.g., finding all shipped orders)
@@ -93,4 +105,12 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
          * Count orders for a specific customer
          */
         Integer countByCustomerId(Long customerId);
+
+        /**
+         * Find orders containing a specific product with given status (excluding a
+         * specific order)
+         */
+        @Query("SELECT DISTINCT o FROM Order o JOIN o.orderItems oi WHERE oi.product.id = :productId AND o.status = :status AND o.id != :excludeOrderId")
+        List<Order> findByProductIdAndStatusAndIdNot(@Param("productId") Long productId,
+                        @Param("status") OrderStatus status, @Param("excludeOrderId") Long excludeOrderId);
 }
