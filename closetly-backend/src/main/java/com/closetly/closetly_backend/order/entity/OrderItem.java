@@ -1,6 +1,7 @@
 package com.closetly.closetly_backend.order.entity;
 
 import com.closetly.closetly_backend.product.entity.Product;
+import com.closetly.closetly_backend.product.entity.ProductVariant;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -46,6 +47,18 @@ public class OrderItem {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
+
+    /**
+     * Reference to ProductVariant (optional - for size-based inventory)
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_variant_id")
+    private ProductVariant productVariant;
+
+    /**
+     * Size of the product variant (stored for historical reference)
+     */
+    private String size;
 
     @Column(nullable = false)
     private Integer quantity = 1;

@@ -59,21 +59,34 @@ public class Order {
     private Integer totalItems;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false,length = 30)
     private OrderStatus status = OrderStatus.PLACED;
 
     @CreationTimestamp
     private LocalDateTime createdAt;
 
+    @Column
+    private LocalDateTime cancelledAt;
+
+    @Column(length = 500)
+    private String cancelReason;
+
+    @Enumerated(EnumType.STRING)
+    private CancelledBy cancelledBy;
+
     private boolean deleted = false;
 
     public enum OrderStatus {
-        PLACED,
-        PAID,
-        SHIPPED,
-        DELIVERED,
-        APPROVED,
+        PENDING,
+        ACCEPTED,
         REJECTED,
-        CANCELLED
+        CANCELLED_BY_CUSTOMER,
+        CANCELLED_BY_SELLER,
+        DELIVERED,
+        COMPLETED, PLACED, APPROVED, CANCELLED, PAID, SHIPPED
+    }
+
+    public enum CancelledBy {
+        CUSTOMER, SELLER
     }
 }

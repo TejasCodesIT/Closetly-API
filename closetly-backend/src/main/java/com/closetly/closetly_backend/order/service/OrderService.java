@@ -26,6 +26,8 @@ public interface OrderService {
     // Get customer orders with pagination
     org.springframework.data.domain.Page<OrderDTO> getCustomerOrders(String email, int page, int size);
 
+    org.springframework.data.domain.Page<OrderDTO> getCustomerOrders(String email, int page, int size, String status);
+
     // Get order history for customer/seller with pagination
     org.springframework.data.domain.Page<OrderDTO> getOrderHistory(String email, boolean sellerSide, int page,
             int size);
@@ -58,4 +60,10 @@ public interface OrderService {
     SellerOrderItemDTO rejectOrderItem(Long orderItemId, String email);
 
     Page<SellerOrderItemDTO> getSellerOrderItems(String email, int page, int size);
+
+    // NEW: Cancel order (customer or seller)
+    OrderDTO cancelOrder(Long orderId, String email, String reason);
+
+    // NEW: Cancel order item (seller only)
+    SellerOrderItemDTO cancelOrderItem(Long orderItemId, String email, String reason);
 }

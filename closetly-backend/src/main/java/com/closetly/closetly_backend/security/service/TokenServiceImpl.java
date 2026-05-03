@@ -22,8 +22,8 @@ public class TokenServiceImpl implements TokenService {
 
     @Override
     public AuthResponse generateTokens(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        User user = userRepository.findByIdIncludingDeleted(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
         String access = tokenProvider.generateToken(
                 new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(user.getEmail(),
                         ""));

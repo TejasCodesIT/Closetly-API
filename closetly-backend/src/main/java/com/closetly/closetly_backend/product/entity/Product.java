@@ -10,7 +10,10 @@ import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.Where;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Data
 @Builder
@@ -31,7 +34,10 @@ public class Product {
     private String description;
 
     private String brand;
+
+    @Column(nullable = false)
     private String category;
+
     private String size;
     private String productCondition;
 
@@ -80,8 +86,11 @@ public class Product {
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "product_images", joinColumns = @JoinColumn(name = "product_id"))
-    @Column(name = "url")
-    private List<String> images;
+    private List<ProductImage> images = new ArrayList<>();
+
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<ProductVariant> variants = new ArrayList<>();
 
     @CreationTimestamp
     private LocalDateTime createdAt;
@@ -90,6 +99,21 @@ public class Product {
     private LocalDateTime updatedAt;
 
     private boolean deleted = false;
+
+    @Transient
+    public List<String> getImageUrls() {
+        if (images == null || images.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return images.stream()
+                .map(ProductImage::getUrl)
+                .collect(Collectors.toList());
+    }
+
+    @Transient
+    public String getPrimaryImageUrl() {
+        return getImageUrls().stream().findFirst().orElse(null);
+    }
 
     public boolean allowsRent() {
         if (productType == null) {

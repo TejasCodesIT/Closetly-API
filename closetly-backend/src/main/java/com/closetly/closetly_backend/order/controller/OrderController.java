@@ -55,13 +55,14 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getCustomerOrders(email));
     }
 
-    // New pagination-enabled endpoint for customer orders
+    // ✅ UPDATED: Support status filtering
     @GetMapping("/my-orders")
     public ResponseEntity<Page<OrderDTO>> getMyOrders(Authentication authentication,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String status) {
         String email = authentication.getName();
-        return ResponseEntity.ok(orderService.getCustomerOrders(email, page, size));
+        return ResponseEntity.ok(orderService.getCustomerOrders(email, page, size, status));
     }
 
     // Get pending order requests for seller
@@ -150,5 +151,25 @@ public class OrderController {
             Authentication authentication) {
         String email = authentication.getName();
         return ResponseEntity.ok(orderService.rejectOrderItem(orderItemId, email));
+    }
+
+    // ========== CANCELLATION ENDPOINTS ==========
+
+    // Cancel order (customer or seller)
+    @PutMapping("/{orderId}/cancel")
+    public ResponseEntity<OrderDTO> cancelOrder(@PathVariable Long orderId,
+            @RequestParam(required = false) String reason,
+            Authentication authentication) {
+        String email = authentication.getName();
+        return ResponseEntity.ok(orderService.cancelOrder(orderId, email, reason));
+    }
+
+    // Cancel order item (seller only)
+    @PutMapping("/order-items/{orderItemId}/cancel")
+    public ResponseEntity<SellerOrderItemDTO> cancelOrderItem(@PathVariable Long orderItemId,
+            @RequestParam(required = false) String reason,
+            Authentication authentication) {
+        String email = authentication.getName();
+        return ResponseEntity.ok(orderService.cancelOrderItem(orderItemId, email, reason));
     }
 }

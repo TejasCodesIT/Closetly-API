@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 @Builder
 public class ImageUploadResponse {
     private String url;
+    private String publicId;
     private String message;
     private boolean success;
 }

@@ -17,7 +17,10 @@ public class ProductRequestDTO {
 
     private String description;
     private String brand;
+
+    @NotBlank(message = "Category is required")
     private String category;
+
     private String size;
     private String condition;
 
@@ -53,6 +56,9 @@ public class ProductRequestDTO {
     private Long sellerId; // id of the user listing this product
 
     private List<String> images;
+
+    private List<String> newImageUrls;
+    private List<String> removeImagePublicIds;
 
     public void validate() {
         log.debug("[ProductRequestDTO Deserialization] RECEIVED VALUES:");

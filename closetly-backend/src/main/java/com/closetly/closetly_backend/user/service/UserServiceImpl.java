@@ -87,13 +87,7 @@ public class UserServiceImpl implements UserService {
                 Long id = Objects.requireNonNull(userId, "userId is required");
                 User user = userRepository.findById(id)
                                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
-                UserProfileDTO dto = new UserProfileDTO();
-                dto.setId(user.getId());
-                dto.setEmail(user.getEmail());
-                dto.setFullName(user.getFullName());
-                dto.setLatitude(user.getLatitude());
-                dto.setLongitude(user.getLongitude());
-                return dto;
+                return toProfileDto(user);
         }
 
         @Override
@@ -262,6 +256,11 @@ public class UserServiceImpl implements UserService {
                 dto.setPhoneNumber(user.getPhoneNumber());
                 dto.setLatitude(user.getLatitude());
                 dto.setLongitude(user.getLongitude());
+                dto.setRoles(user.getRoles());
+                dto.setEnabled(user.isEnabled());
+                dto.setDeleted(user.isDeleted());
+                dto.setCreatedAt(user.getCreatedAt());
+                dto.setUpdatedAt(user.getUpdatedAt());
                 return dto;
         }
 }

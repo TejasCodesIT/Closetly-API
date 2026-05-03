@@ -17,4 +17,7 @@ public interface BookingService {
     List<BookingResponseDTO> getMyRequests(String email);
 
     List<BookingResponseDTO> getBookingsOnMyProducts(String email);
+
+    // NEW: Cancel booking (customer or seller)
+    BookingResponseDTO cancelBooking(Long bookingId, String email, String reason);
 }

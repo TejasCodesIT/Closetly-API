@@ -17,6 +17,9 @@ public class OrderItemRequestDTO {
     @Min(value = 1, message = "Quantity must be at least 1")
     private Integer quantity = 1;
 
+    // Size-based inventory (optional)
+    private String size;
+
     // For rentals
     private LocalDate startDate;
     private LocalDate endDate;

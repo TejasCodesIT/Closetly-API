@@ -23,10 +23,11 @@ public class ImageController {
         try {
             log.info("Received image upload request for file: {}", file.getOriginalFilename());
 
-            String url = imageUploadService.uploadImage(file);
+            ImageUploadService.CloudinaryImageData uploadResult = imageUploadService.uploadImage(file);
 
             ImageUploadResponse response = ImageUploadResponse.builder()
-                    .url(url)
+                    .url(uploadResult.getUrl())
+                    .publicId(uploadResult.getPublicId())
                     .message("Image uploaded successfully")
                     .success(true)
                     .build();

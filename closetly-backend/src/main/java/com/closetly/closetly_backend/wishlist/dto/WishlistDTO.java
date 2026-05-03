@@ -1,5 +1,6 @@
 package com.closetly.closetly_backend.wishlist.dto;
 
+import com.closetly.closetly_backend.product.entity.ProductType;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -16,5 +17,8 @@ public class WishlistDTO {
     private Double productSalePrice;
     private Double productRentPricePerDay;
     private List<String> productImages;
+    private ProductType productType;
+    private boolean isForSale;
+    private boolean isForRent;
     private LocalDateTime addedAt;
 }

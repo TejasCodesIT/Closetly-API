@@ -16,9 +16,7 @@ public class AdminMapper {
 
     public static ReportedProductDTO toReportedProductDTO(Report report) {
         Product product = report.getProduct();
-        String productImage = product.getImages() != null && !product.getImages().isEmpty()
-                ? product.getImages().get(0)
-                : null;
+        String productImage = product.getPrimaryImageUrl();
 
         return ReportedProductDTO.builder()
                 .id(report.getId())
@@ -31,7 +29,7 @@ public class AdminMapper {
                 .status(report.getStatus().toString())
                 .severity("MEDIUM") // Default severity
                 .reportedAt(report.getReportedAt())
-                .images(product.getImages())
+                .images(product.getImageUrls())
                 .build();
     }
 

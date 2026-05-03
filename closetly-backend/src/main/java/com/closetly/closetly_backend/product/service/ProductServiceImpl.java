@@ -2,10 +2,14 @@ package com.closetly.closetly_backend.product.service;
 
 import com.closetly.closetly_backend.product.dto.ProductDTO;
 import com.closetly.closetly_backend.product.dto.ProductRequestDTO;
+import com.closetly.closetly_backend.product.dto.ProductDTO;
+import com.closetly.closetly_backend.product.dto.ProductRequestDTO;
 import com.closetly.closetly_backend.product.entity.Product;
 import com.closetly.closetly_backend.product.entity.Product.ProductStatus;
+import com.closetly.closetly_backend.product.entity.ProductImage;
 import com.closetly.closetly_backend.product.entity.ProductType;
 import com.closetly.closetly_backend.product.repository.ProductRepository;
+import com.closetly.closetly_backend.product.service.ImageUploadService;
 import com.closetly.closetly_backend.product.specification.ProductSpecifications;
 import com.closetly.closetly_backend.user.entity.Role;
 import com.closetly.closetly_backend.user.entity.User;
@@ -22,7 +26,12 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -33,6 +42,7 @@ public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final ImageUploadService imageUploadService;
 
     @Override
     public ProductDTO createProduct(ProductRequestDTO request, String email) {
@@ -123,7 +133,7 @@ public class ProductServiceImpl implements ProductService {
                 .forSale(forSale)
                 .forRent(forRent)
                 .quantity(request.getQuantity())
-                .images(request.getImages())
+                .images(convertImageUrlsToProductImages(request.getImages()))
                 .seller(seller)
                 .status(Product.ProductStatus.ACTIVE)
                 .build();
@@ -200,12 +210,149 @@ public class ProductServiceImpl implements ProductService {
         existing.setCity(request.getCity());
         existing.setAddress(request.getAddress());
         existing.setState(request.getState() != null ? request.getState() : "Maharashtra");
-        existing.setImages(request.getImages());
+
+        log.info("[Product Update] About to reconcile images - productId: {}", id);
+        log.info("[Product Update] Existing images count: {}",
+                existing.getImages() != null ? existing.getImages().size() : 0);
+        log.info("[Product Update] Request images: {}", request.getImages());
+        log.info("[Product Update] New image URLs: {}", request.getNewImageUrls());
+        log.info("[Product Update] Remove publicIds: {}", request.getRemoveImagePublicIds());
+
+        existing.setImages(reconcileProductImages(existing.getImages(), request));
+
+        log.info("[Product Update] After reconciliation - images count: {}", existing.getImages().size());
 
         Product updated = productRepository.save(existing);
         log.info("[Product Update] Product updated successfully - id: {}, title: {}", updated.getId(),
                 updated.getTitle());
         return toDto(updated);
+    }
+
+    private List<ProductImage> reconcileProductImages(List<ProductImage> existingImages, ProductRequestDTO request) {
+        log.info("[Reconcile Images] Starting reconciliation");
+        log.info("[Reconcile Images] Existing images count: {}", existingImages != null ? existingImages.size() : 0);
+        log.info("[Reconcile Images] Request images count: {}",
+                request.getImages() != null ? request.getImages().size() : 0);
+
+        if (existingImages == null) {
+            existingImages = new ArrayList<>();
+        }
+
+        List<String> requestedUrls = request.getImages() != null ? request.getImages() : List.of();
+        List<String> newImageUrls = request.getNewImageUrls() != null ? request.getNewImageUrls() : List.of();
+        Set<String> removePublicIds = request.getRemoveImagePublicIds() != null
+                ? new java.util.HashSet<>(request.getRemoveImagePublicIds())
+                : Set.of();
+
+        log.info("[Reconcile Images] removePublicIds count: {}, values: {}", removePublicIds.size(), removePublicIds);
+
+        // Preserve images that are still present in the request and not explicitly
+        // removed
+        List<ProductImage> keptImages = existingImages.stream()
+                .filter(image -> requestedUrls.contains(image.getUrl())
+                        && !removePublicIds.contains(image.getPublicId()))
+                .collect(Collectors.toList());
+        log.info("[Reconcile Images] Kept images count: {}", keptImages.size());
+
+        // Delete images that were removed from the listing
+        List<ProductImage> imagesToDelete = existingImages.stream()
+                .filter(image -> !requestedUrls.contains(image.getUrl())
+                        || removePublicIds.contains(image.getPublicId()))
+                .collect(Collectors.toList());
+
+        log.info("[Reconcile Images] Images to delete count: {}", imagesToDelete.size());
+        imagesToDelete.forEach(image -> {
+            if (image.getPublicId() != null && !image.getPublicId().isBlank()) {
+                log.info("[Reconcile Images] Deleting from Cloudinary - publicId: {}, url: {}",
+                        image.getPublicId(), image.getUrl());
+                try {
+                    imageUploadService.deleteImage(image.getPublicId());
+                    log.info("[Reconcile Images] ✅ Deleted from Cloudinary: {}", image.getPublicId());
+                } catch (Exception ex) {
+                    log.error("[Reconcile Images] ❌ Failed to delete from Cloudinary {}: {}",
+                            image.getPublicId(), ex.getMessage(), ex);
+                }
+            } else {
+                log.warn("[Reconcile Images] No publicId for image - url: {}", image.getUrl());
+            }
+        });
+
+        // Add any newly uploaded images
+        for (String newImageUrl : newImageUrls) {
+            if (newImageUrl == null || newImageUrl.isBlank()) {
+                continue;
+            }
+            boolean alreadyPresent = keptImages.stream()
+                    .anyMatch(image -> newImageUrl.equals(image.getUrl()));
+            if (alreadyPresent) {
+                continue;
+            }
+            String publicId = extractPublicIdFromCloudinaryUrl(newImageUrl);
+            keptImages.add(ProductImage.builder()
+                    .url(newImageUrl)
+                    .publicId(publicId)
+                    .displayOrder(keptImages.size())
+                    .build());
+            log.info("[Reconcile Images] Added new image - url: {}, publicId: {}", newImageUrl, publicId);
+        }
+
+        // If request did not send any explicit newImageUrls, preserve any requested
+        // image URLs that came from existing data
+        for (String requestedUrl : requestedUrls) {
+            boolean alreadyPresent = keptImages.stream().anyMatch(image -> requestedUrl.equals(image.getUrl()));
+            if (!alreadyPresent) {
+                String publicId = extractPublicIdFromCloudinaryUrl(requestedUrl);
+                keptImages.add(ProductImage.builder()
+                        .url(requestedUrl)
+                        .publicId(publicId)
+                        .displayOrder(keptImages.size())
+                        .build());
+                log.info("[Reconcile Images] Added kept image - url: {}, publicId: {}", requestedUrl, publicId);
+            }
+        }
+
+        log.info("[Reconcile Images] ✅ Complete - final size: {}", keptImages.size());
+        return keptImages;
+    }
+
+    private List<ProductImage> convertImageUrlsToProductImages(List<String> imageUrls) {
+        if (imageUrls == null) {
+            return new ArrayList<>();
+        }
+        List<ProductImage> images = new ArrayList<>();
+        for (int i = 0; i < imageUrls.size(); i++) {
+            String url = imageUrls.get(i);
+            if (url != null && !url.isBlank()) {
+                images.add(ProductImage.builder()
+                        .url(url)
+                        .publicId(extractPublicIdFromCloudinaryUrl(url))
+                        .displayOrder(i)
+                        .build());
+            }
+        }
+        return images;
+    }
+
+    private String extractPublicIdFromCloudinaryUrl(String imageUrl) {
+        if (imageUrl == null || imageUrl.isBlank()) {
+            return null;
+        }
+        try {
+            URI uri = URI.create(imageUrl);
+            String path = uri.getPath();
+            if (path == null || path.isBlank()) {
+                return null;
+            }
+            String filename = path.substring(path.lastIndexOf('/') + 1);
+            if (filename.isBlank()) {
+                return null;
+            }
+            int dotIndex = filename.lastIndexOf('.');
+            return dotIndex > 0 ? filename.substring(0, dotIndex) : filename;
+        } catch (IllegalArgumentException ex) {
+            log.debug("[Product Image] Failed to parse Cloudinary publicId from URL: {}", imageUrl);
+            return null;
+        }
     }
 
     @Override
@@ -571,7 +718,7 @@ public class ProductServiceImpl implements ProductService {
         dto.setAddress(p.getAddress());
         dto.setState(p.getState());
         dto.setSellerId(p.getSeller() != null ? p.getSeller().getId() : null);
-        dto.setImages(p.getImages());
+        dto.setImages(p.getImageUrls());
         return dto;
     }
 

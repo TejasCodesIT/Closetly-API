@@ -56,16 +56,9 @@ public class AuthController {
         }
 
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
-
         User user = userDetails.getUser();
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("id", user.getId());
-        response.put("email", user.getEmail());
-        response.put("fullName", user.getFullName());
-        response.put("roles", user.getRoles());
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(userService.getProfileByEmail(user.getEmail()));
     }
 
     @PostMapping("/forgot-password")

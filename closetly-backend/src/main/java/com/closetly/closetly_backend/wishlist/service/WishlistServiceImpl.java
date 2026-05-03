@@ -14,7 +14,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -112,7 +111,10 @@ public class WishlistServiceImpl implements WishlistService {
         dto.setProductBrand(wishlist.getProduct().getBrand());
         dto.setProductSalePrice(wishlist.getProduct().getSalePrice());
         dto.setProductRentPricePerDay(wishlist.getProduct().getRentPrice());
-        dto.setProductImages(wishlist.getProduct().getImages());
+        dto.setProductImages(wishlist.getProduct().getImageUrls());
+        dto.setProductType(wishlist.getProduct().getProductType());
+        dto.setForSale(wishlist.getProduct().isForSale());
+        dto.setForRent(wishlist.getProduct().isForRent());
         dto.setAddedAt(wishlist.getCreatedAt());
         return dto;
     }

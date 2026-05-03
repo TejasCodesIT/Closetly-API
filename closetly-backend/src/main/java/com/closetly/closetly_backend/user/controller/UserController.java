@@ -38,15 +38,19 @@ public class UserController {
     }
 
     @PutMapping("/profile")
-    public ResponseEntity<?> updateProfile(@RequestBody UpdateProfileRequestDTO request, Authentication authentication) {
+    public ResponseEntity<?> updateProfile(@RequestBody UpdateProfileRequestDTO request,
+            Authentication authentication) {
         return ResponseEntity.ok(userService.updateProfile(authentication.getName(), request));
     }
 
     @PostMapping("/upload-profile-image")
-    public ResponseEntity<?> uploadProfileImage(@RequestParam("file") MultipartFile file,
+    public ResponseEntity<?> uploadProfileImage(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "customerName", required = false) String customerName,
             Authentication authentication) {
         var profile = userService.getProfileByEmail(authentication.getName());
-        String url = profileImageStorageService.saveProfileImage(file, profile.getId());
+        String ownerName = (customerName == null || customerName.isBlank()) ? profile.getFullName() : customerName;
+        String url = profileImageStorageService.saveProfileImage(file, profile.getId(), ownerName);
         return ResponseEntity.ok(userService.updateProfileImage(authentication.getName(), url));
     }
 
@@ -55,5 +59,10 @@ public class UserController {
             Authentication authentication) {
         userService.changePassword(authentication.getName(), request.getCurrentPassword(), request.getNewPassword());
         return ResponseEntity.ok().body(java.util.Map.of("message", "Password changed successfully"));
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<?> getCurrentUserProfile(Authentication authentication) {
+        return ResponseEntity.ok(userService.getProfileByEmail(authentication.getName()));
     }
 }

@@ -2,8 +2,10 @@ package com.closetly.closetly_backend.admin.controller;
 
 import com.closetly.closetly_backend.admin.dto.*;
 import com.closetly.closetly_backend.admin.entity.ReviewFlag;
-import com.closetly.closetly_backend.product.entity.Product;
 import com.closetly.closetly_backend.admin.service.*;
+import com.closetly.closetly_backend.product.entity.Product;
+import com.closetly.closetly_backend.support.service.SupportRequestService;
+import com.closetly.closetly_backend.support.entity.SupportRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -33,6 +35,7 @@ public class AdminController {
     private final SystemLogService systemLogService;
     private final ReportExportService reportExportService;
     private final AdminService adminService;
+    private final SupportRequestService supportRequestService;
 
     // ==================== Dashboard Overview API ====================
 
@@ -228,6 +231,16 @@ public class AdminController {
         return ResponseEntity.ok("User unblocked successfully");
     }
 
+    /**
+     * DELETE /api/admin/users/{userId}
+     * Delete a user
+     */
+    @DeleteMapping("/users/{userId}")
+    public ResponseEntity<String> deleteUser(@PathVariable Long userId) {
+        adminService.deleteUser(userId);
+        return ResponseEntity.ok("User deleted successfully");
+    }
+
     // ==================== Products Management API ====================
 
     /**
@@ -261,6 +274,16 @@ public class AdminController {
     public ResponseEntity<String> rejectProduct(@PathVariable Long productId) {
         adminService.deleteProduct(productId);
         return ResponseEntity.ok("Product rejected successfully");
+    }
+
+    /**
+     * PUT /api/admin/products/{productId}/block
+     * Block a product
+     */
+    @PutMapping("/products/{productId}/block")
+    public ResponseEntity<String> blockProduct(@PathVariable Long productId) {
+        adminService.blockProduct(productId);
+        return ResponseEntity.ok("Product blocked successfully");
     }
 
     /**
@@ -322,49 +345,66 @@ public class AdminController {
 
     /**
      * GET /api/admin/requests
-     * Returns paginated list of all requests (placeholder - not implemented yet)
+     * Returns paginated list of all requests (support requests)
      */
     @GetMapping("/requests")
     public ResponseEntity<Page<RequestDTO>> getAllRequests(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        // Placeholder until request functionality is implemented
-        return ResponseEntity.ok(Page.empty());
+        Pageable pageable = PageRequest.of(page, size);
+        Page<SupportRequest> supportRequests = supportRequestService.getAllSupportRequests(pageable);
+        Page<RequestDTO> requestDTOs = supportRequests.map(this::mapSupportRequestToRequestDTO);
+        return ResponseEntity.ok(requestDTOs);
     }
 
     // ==================== Export Report API ====================
 
     /**
-     * GET /api/admin/reports/export?type=monthly
-     * Exports reports to CSV file
+     * POST /api/admin/export
+     * Export reports in different formats (PDF, CSV, XLSX)
      */
-    @GetMapping("/reports/export")
-    public ResponseEntity<String> exportReports(
-            @RequestParam(defaultValue = "monthly") String type) {
+    @PostMapping("/export")
+    public ResponseEntity<byte[]> exportReport(@RequestBody ExportRequestDTO request) {
         try {
-            String csvContent = reportExportService.exportReportsToCsv(type);
+            byte[] fileData;
+            String contentType;
+            String filename;
 
-            String filename = String.format("reports_%s_%s.csv",
-                    type,
-                    LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")));
+            switch (request.getFormat().toLowerCase()) {
+                case "csv":
+                    String csvContent = reportExportService.exportReportsToCsv("monthly"); // Default to monthly for now
+                    fileData = csvContent.getBytes();
+                    contentType = "text/csv";
+                    filename = "reports.csv";
+                    break;
+                case "pdf":
+                    // For now, return CSV as PDF placeholder
+                    String pdfContent = reportExportService.exportReportsToCsv("monthly");
+                    fileData = pdfContent.getBytes();
+                    contentType = "application/pdf";
+                    filename = "reports.pdf";
+                    break;
+                case "xlsx":
+                    // For now, return CSV as XLSX placeholder
+                    String xlsxContent = reportExportService.exportReportsToCsv("monthly");
+                    fileData = xlsxContent.getBytes();
+                    contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+                    filename = "reports.xlsx";
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unsupported format: " + request.getFormat());
+            }
 
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-                    .header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_VALUE)
-                    .body(csvContent);
+                    .header(HttpHeaders.CONTENT_TYPE, contentType)
+                    .header(HttpHeaders.CONTENT_LENGTH, String.valueOf(fileData.length))
+                    .body(fileData);
+
         } catch (IOException e) {
             return ResponseEntity.internalServerError()
-                    .body("Error generating report: " + e.getMessage());
+                    .body(("Error generating report: " + e.getMessage()).getBytes());
         }
-    }
-
-    /**
-     * GET /api/admin/export
-     * Alias for reports export (defaults to monthly)
-     */
-    @GetMapping("/export")
-    public ResponseEntity<String> exportDefault() {
-        return exportReports("monthly");
     }
 
     /**
@@ -398,5 +438,21 @@ public class AdminController {
             @RequestParam ReviewFlag.FlagStatus status) {
         reviewModerationService.updateReviewFlagStatus(reviewFlagId, status);
         return ResponseEntity.ok("Review flag status updated to " + status);
+    }
+
+    /**
+     * Helper method to map SupportRequest to RequestDTO
+     */
+    private RequestDTO mapSupportRequestToRequestDTO(SupportRequest supportRequest) {
+        return RequestDTO.builder()
+                .id(supportRequest.getId())
+                .type("HELP") // All support requests are help requests
+                .description(supportRequest.getSubject() + ": " + supportRequest.getMessage())
+                .userId(null) // Support requests don't have user IDs in current implementation
+                .userName(supportRequest.getName())
+                .status(supportRequest.getStatus().name())
+                .createdAt(supportRequest.getCreatedAt())
+                .resolvedAt(null) // Not tracking resolution time yet
+                .build();
     }
 }

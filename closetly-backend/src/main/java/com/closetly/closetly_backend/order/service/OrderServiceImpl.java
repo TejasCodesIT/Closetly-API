@@ -10,7 +10,10 @@ import com.closetly.closetly_backend.chat.repository.ChatRoomRepository;
 import com.closetly.closetly_backend.order.repository.OrderItemRepository;
 import com.closetly.closetly_backend.order.repository.OrderRepository;
 import com.closetly.closetly_backend.product.entity.Product;
+import com.closetly.closetly_backend.product.entity.ProductVariant;
 import com.closetly.closetly_backend.product.repository.ProductRepository;
+import com.closetly.closetly_backend.product.repository.ProductVariantRepository;
+import com.closetly.closetly_backend.user.service.EmailService;
 import com.closetly.closetly_backend.user.entity.User;
 import com.closetly.closetly_backend.user.repository.UserRepository;
 import com.closetly.closetly_backend.cart.entity.CartItem;
@@ -39,9 +42,11 @@ public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final ProductRepository productRepository;
+    private final ProductVariantRepository productVariantRepository;
     private final UserRepository userRepository;
     private final CartItemRepository cartItemRepository;
     private final ChatRoomRepository chatRoomRepository;
+    private final EmailService emailService;
 
     /**
      * Validates and sets default status for orders
@@ -174,8 +179,20 @@ public class OrderServiceImpl implements OrderService {
                                 + 1;
                     }
 
+                    // Handle size-based variants
+                    ProductVariant variant = null;
+                    String size = itemRequest.getSize();
+                    if (size != null && !size.trim().isEmpty()) {
+                        variant = productVariantRepository.findByProductAndSize(product, size.trim())
+                                .orElseThrow(() -> new IllegalArgumentException(
+                                        "Product variant not found for size: " + size + " in product: "
+                                                + product.getTitle()));
+                    }
+
                     return OrderItem.builder()
                             .product(product)
+                            .productVariant(variant)
+                            .size(size)
                             .quantity(itemRequest.getQuantity())
                             .unitPrice(unitPrice)
                             .totalPrice(totalPrice)
@@ -210,10 +227,16 @@ public class OrderServiceImpl implements OrderService {
         // Update product quantities for BUY items
         for (OrderItem item : orderItems) {
             if (item.getType() == OrderItemType.BUY) {
-                Product product = item.getProduct();
-                Integer currentQty = product.getQuantity();
-                if (currentQty != null && currentQty > 0) {
-                    product.setQuantity(currentQty - item.getQuantity());
+                if (item.getProductVariant() != null) {
+                    // Update variant quantity
+                    item.getProductVariant().decreaseQuantity(item.getQuantity());
+                } else {
+                    // Fallback to product quantity (for backward compatibility)
+                    Product product = item.getProduct();
+                    Integer currentQty = product.getQuantity();
+                    if (currentQty != null && currentQty > 0) {
+                        product.setQuantity(currentQty - item.getQuantity());
+                    }
                 }
             }
         }
@@ -414,6 +437,34 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    public Page<OrderDTO> getCustomerOrders(String email, int page, int size, String status) {
+        User customer = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Customer not found"));
+
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.max(size, 1));
+
+        Page<Order> ordersPage;
+        if (status != null && !status.isEmpty()) {
+            // Handle CANCELLED status to include all cancelled types
+            if ("CANCELLED".equals(status)) {
+                ordersPage = orderRepository.findByCustomerIdAndStatusInOrderByCreatedAtDesc(
+                        customer.getId(),
+                        List.of(OrderStatus.CANCELLED_BY_CUSTOMER, OrderStatus.CANCELLED_BY_SELLER,
+                                OrderStatus.CANCELLED),
+                        pageable);
+            } else {
+                OrderStatus orderStatus = OrderStatus.valueOf(status);
+                ordersPage = orderRepository.findByCustomerIdAndStatusOrderByCreatedAtDesc(customer.getId(),
+                        orderStatus, pageable);
+            }
+        } else {
+            ordersPage = orderRepository.findByCustomerIdOrderByCreatedAtDesc(customer.getId(), pageable);
+        }
+
+        return ordersPage.map(this::toDto);
+    }
+
+    @Override
     public Page<SellerOrderItemDTO> getSellerOrderItems(String email, int page, int size) {
 
         User seller = userRepository.findByEmail(email)
@@ -523,8 +574,7 @@ public class OrderServiceImpl implements OrderService {
         dto.setProductId(product.getId());
         dto.setProductTitle(product.getTitle());
         dto.setProductBrand(product.getBrand());
-        dto.setProductImage(
-                product.getImages() != null && !product.getImages().isEmpty() ? product.getImages().get(0) : null);
+        dto.setProductImage(product.getPrimaryImageUrl());
         dto.setQuantity(item.getQuantity());
         dto.setUnitPrice(item.getUnitPrice());
         dto.setTotalPrice(item.getTotalPrice());
@@ -550,10 +600,7 @@ public class OrderServiceImpl implements OrderService {
             dto.setProductBrand(product.getBrand());
 
             // Get first image URL safely
-            dto.setProductImageUrl(
-                    product.getImages() != null && !product.getImages().isEmpty()
-                            ? product.getImages().get(0)
-                            : null);
+            dto.setProductImageUrl(product.getPrimaryImageUrl());
 
             dto.setPrice(firstItem.getTotalPrice());
         }
@@ -772,9 +819,7 @@ public class OrderServiceImpl implements OrderService {
         dto.setProductId(orderItem.getProduct().getId());
         dto.setProductName(orderItem.getProduct().getTitle());
         dto.setProductBrand(orderItem.getProduct().getBrand());
-        dto.setImage(orderItem.getProduct().getImages() != null && !orderItem.getProduct().getImages().isEmpty()
-                ? orderItem.getProduct().getImages().get(0)
-                : null);
+        dto.setImage(orderItem.getProduct().getPrimaryImageUrl());
         dto.setQuantity(orderItem.getQuantity());
         dto.setPrice(orderItem.getTotalPrice());
         dto.setType(orderItem.getType().toString());
@@ -789,5 +834,147 @@ public class OrderServiceImpl implements OrderService {
     public Page<OrderDTO> getSellerOrders(String email, int page, int size) {
         // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'getSellerOrders'");
+    }
+
+    @Override
+    @Transactional
+    public OrderDTO cancelOrder(Long orderId, String email, String reason) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        Order order = orderRepository.findByIdWithItemsAndProducts(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found"));
+
+        // Check authorization - customer or seller can cancel
+        boolean isCustomer = order.getCustomer().getId().equals(user.getId());
+        boolean isSeller = order.getSeller().getId().equals(user.getId());
+
+        if (!isCustomer && !isSeller) {
+            throw new IllegalStateException("You can only cancel your own orders or orders for your products");
+        }
+
+        // Validate cancellation rules
+        if (order.getStatus() == OrderStatus.CANCELLED_BY_CUSTOMER ||
+                order.getStatus() == OrderStatus.CANCELLED_BY_SELLER) {
+            throw new IllegalStateException("Order is already cancelled");
+        }
+
+        if (order.getStatus() == OrderStatus.DELIVERED || order.getStatus() == OrderStatus.COMPLETED) {
+            throw new IllegalStateException("Cannot cancel order that is already delivered or completed");
+        }
+
+        // Update order status and cancellation details
+        if (isCustomer) {
+            order.setStatus(OrderStatus.CANCELLED_BY_CUSTOMER);
+            order.setCancelledBy(Order.CancelledBy.CUSTOMER);
+        } else {
+            order.setStatus(OrderStatus.CANCELLED_BY_SELLER);
+            order.setCancelledBy(Order.CancelledBy.SELLER);
+        }
+
+        order.setCancelReason(reason);
+        order.setCancelledAt(java.time.LocalDateTime.now());
+
+        // Restore stock for BUY items
+        for (OrderItem item : order.getOrderItems()) {
+            if (item.getType() == OrderItemType.BUY) {
+                if (item.getProductVariant() != null) {
+                    // Restore variant quantity
+                    item.getProductVariant().increaseQuantity(item.getQuantity());
+                } else {
+                    // Restore product quantity (fallback)
+                    Product product = item.getProduct();
+                    Integer currentQty = product.getQuantity();
+                    if (currentQty != null) {
+                        product.setQuantity(currentQty + item.getQuantity());
+                    }
+                }
+            }
+        }
+
+        Order saved = orderRepository.save(order);
+
+        // Send notifications
+        sendCancellationNotifications(saved, reason);
+
+        return toDto(saved);
+    }
+
+    @Override
+    @Transactional
+    public SellerOrderItemDTO cancelOrderItem(Long orderItemId, String email, String reason) {
+        User seller = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Seller not found"));
+
+        OrderItem orderItem = orderItemRepository.findById(orderItemId)
+                .orElseThrow(() -> new IllegalArgumentException("Order item not found"));
+
+        // Verify seller owns this product
+        if (!orderItem.getProduct().getSeller().getId().equals(seller.getId())) {
+            throw new IllegalStateException("You can only cancel order items for your own products");
+        }
+
+        Order order = orderItem.getOrder();
+
+        // Validate cancellation rules
+        if (order.getStatus() == OrderStatus.CANCELLED_BY_CUSTOMER ||
+                order.getStatus() == OrderStatus.CANCELLED_BY_SELLER) {
+            throw new IllegalStateException("Order is already cancelled");
+        }
+
+        if (order.getStatus() == OrderStatus.DELIVERED || order.getStatus() == OrderStatus.COMPLETED) {
+            throw new IllegalStateException("Cannot cancel order that is already delivered or completed");
+        }
+
+        // Update order status and cancellation details
+        order.setStatus(OrderStatus.CANCELLED_BY_SELLER);
+        order.setCancelledBy(Order.CancelledBy.SELLER);
+        order.setCancelReason(reason);
+        order.setCancelledAt(java.time.LocalDateTime.now());
+
+        // Restore stock for this specific item
+        if (orderItem.getType() == OrderItemType.BUY) {
+            if (orderItem.getProductVariant() != null) {
+                // Restore variant quantity
+                orderItem.getProductVariant().increaseQuantity(orderItem.getQuantity());
+            } else {
+                // Restore product quantity (fallback)
+                Product product = orderItem.getProduct();
+                Integer currentQty = product.getQuantity();
+                if (currentQty != null) {
+                    product.setQuantity(currentQty + orderItem.getQuantity());
+                }
+            }
+        }
+
+        orderRepository.save(order);
+
+        // Send notifications
+        sendCancellationNotifications(order, reason);
+
+        return toSellerOrderItemDto(orderItem);
+    }
+
+    private void sendCancellationNotifications(Order order, String reason) {
+        String productTitle = order.getOrderItems().isEmpty() ? "Product"
+                : order.getOrderItems().get(0).getProduct().getTitle();
+
+        if (order.getCancelledBy() == Order.CancelledBy.CUSTOMER) {
+            // Notify seller
+            emailService.sendOrderCancelledByCustomerEmail(
+                    order.getSeller().getEmail(),
+                    productTitle,
+                    order.getCustomer().getFullName(),
+                    order.getId().toString(),
+                    reason);
+        } else {
+            // Notify customer
+            emailService.sendOrderCancelledBySellerEmail(
+                    order.getCustomer().getEmail(),
+                    productTitle,
+                    order.getSeller().getFullName(),
+                    order.getId().toString(),
+                    reason);
+        }
     }
 }

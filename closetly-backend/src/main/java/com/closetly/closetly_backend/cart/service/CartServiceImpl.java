@@ -238,7 +238,7 @@ public class CartServiceImpl implements CartService {
         productDto.setForRent(product.allowsRent());
         productDto.setQuantity(product.getQuantity());
         productDto.setSellerId(product.getSeller() != null ? product.getSeller().getId() : null);
-        productDto.setImages(product.getImages());
+        productDto.setImages(product.getImageUrls());
 
         CartItemDTO dto = new CartItemDTO();
         dto.setId(cartItem.getId());

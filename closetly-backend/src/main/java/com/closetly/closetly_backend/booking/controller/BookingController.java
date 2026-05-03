@@ -18,17 +18,16 @@ public class BookingController {
     private final BookingService bookingService;
 
     @PostMapping
-public ResponseEntity<BookingResponseDTO> createBooking(
-        @Valid @RequestBody BookingRequestDTO request,
-        Authentication authentication) {
+    public ResponseEntity<BookingResponseDTO> createBooking(
+            @Valid @RequestBody BookingRequestDTO request,
+            Authentication authentication) {
 
-    String email = authentication.getName(); // logged-in user email
+        String email = authentication.getName(); // logged-in user email
 
-    BookingResponseDTO response =
-            bookingService.createBooking(request, email);
+        BookingResponseDTO response = bookingService.createBooking(request, email);
 
-    return ResponseEntity.ok(response);
-}
+        return ResponseEntity.ok(response);
+    }
 
     @PostMapping("/{id}/approve")
     public ResponseEntity<BookingResponseDTO> approve(@PathVariable Long id, Authentication authentication) {
@@ -53,5 +52,14 @@ public ResponseEntity<BookingResponseDTO> createBooking(
     @GetMapping("/my-products")
     public ResponseEntity<List<BookingResponseDTO>> myProducts(Authentication authentication) {
         return ResponseEntity.ok(bookingService.getBookingsOnMyProducts(authentication.getName()));
+    }
+
+    // Cancel booking (customer or seller)
+    @PutMapping("/{bookingId}/cancel")
+    public ResponseEntity<BookingResponseDTO> cancelBooking(@PathVariable Long bookingId,
+            @RequestParam(required = false) String reason,
+            Authentication authentication) {
+        String email = authentication.getName();
+        return ResponseEntity.ok(bookingService.cancelBooking(bookingId, email, reason));
     }
 }

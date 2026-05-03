@@ -58,12 +58,12 @@ public class AdminService {
 
     @Transactional
     @SuppressWarnings("null")
-    public void unblockUser(Long userId) {
+    public void deleteUser(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        user.setBlocked(false);
+        user.setDeleted(true);
         userRepository.save(user);
-        logAction(SystemLog.LogType.SYSTEM_ACTION, "User " + userId + " unblocked by admin");
+        logAction(SystemLog.LogType.USER_BANNED, "User " + userId + " deleted by admin");
     }
 
     @Transactional
@@ -78,12 +78,22 @@ public class AdminService {
 
     @Transactional
     @SuppressWarnings("null")
-    public void restoreProduct(Long productId) {
+    public void blockProduct(Long productId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
-        product.setDeleted(false);
+        product.setStatus(Product.ProductStatus.BLOCKED);
         productRepository.save(product);
-        logAction(SystemLog.LogType.SYSTEM_ACTION, "Product " + productId + " restored by admin");
+        logAction(SystemLog.LogType.SYSTEM_ACTION, "Product " + productId + " blocked by admin");
+    }
+
+    @Transactional
+    @SuppressWarnings("null")
+    public void unblockUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        user.setBlocked(false);
+        userRepository.save(user);
+        logAction(SystemLog.LogType.USER_BANNED, "User " + userId + " unblocked by admin");
     }
 
     @Transactional
@@ -157,10 +167,7 @@ public class AdminService {
                 .productId(booking.getProduct().getId())
                 .productTitle(booking.getProduct().getTitle())
                 .productBrand(booking.getProduct().getBrand())
-                .productImageUrl(
-                        booking.getProduct().getImages() != null && !booking.getProduct().getImages().isEmpty()
-                                ? booking.getProduct().getImages().get(0)
-                                : null)
+                .productImageUrl(booking.getProduct().getPrimaryImageUrl())
                 .buyerId(booking.getCustomer().getId())
                 .buyerName(booking.getCustomer().getFullName())
                 .sellerId(booking.getProduct().getSeller().getId())
@@ -180,5 +187,16 @@ public class AdminService {
                 .message(message)
                 .build();
         systemLogRepository.save(log);
+    }
+
+    @Transactional
+    @SuppressWarnings("null")
+    public void restoreProduct(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new RuntimeException("Product not found"));
+        product.setDeleted(false);
+        product.setStatus(Product.ProductStatus.ACTIVE);
+        productRepository.save(product);
+        logAction(SystemLog.LogType.SYSTEM_ACTION, "Product " + productId + " restored by admin");
     }
 }

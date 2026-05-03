@@ -38,6 +38,7 @@ public class Booking {
     private String message;
 
     @Enumerated(EnumType.STRING)
+    @Column(length = 30)
     private BookingStatus status = BookingStatus.PENDING;
 
     @CreationTimestamp
@@ -46,12 +47,28 @@ public class Booking {
     @UpdateTimestamp
     private LocalDateTime updatedAt;
 
+    @Column
+    private LocalDateTime cancelledAt;
+
+    @Column(length = 500)
+    private String cancelReason;
+
+    @Enumerated(EnumType.STRING)
+    private CancelledBy cancelledBy;
+
     private boolean deleted = false;
 
     public enum BookingStatus {
         PENDING,
-        APPROVED,
+        ACCEPTED,
         REJECTED,
-        CANCELLED
+        CANCELLED_BY_CUSTOMER,
+        CANCELLED_BY_SELLER,
+        DELIVERED,
+        COMPLETED, APPROVED, CANCELLED
+    }
+
+    public enum CancelledBy {
+        CUSTOMER, SELLER
     }
 }

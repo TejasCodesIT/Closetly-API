@@ -1,15 +1,18 @@
 package com.closetly.closetly_backend.security;
 
+import com.closetly.closetly_backend.security.CustomUserDetails;
+import com.closetly.closetly_backend.user.entity.User;
+import com.closetly.closetly_backend.user.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -19,11 +22,13 @@ import java.io.IOException;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
+    private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
+
     @Autowired
     private JwtTokenProvider tokenProvider;
 
     @Autowired
-    private UserDetailsService userDetailsService;
+    private UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request,
@@ -32,22 +37,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String jwt = getJwtFromRequest(request);
 
-        System.out.println("Authorization Header: ****************" + request.getHeader("Authorization"));
-
         if (jwt != null) {
-            System.out.println("JWT extracted: *************" + jwt);
+            log.debug("JWT extracted from Authorization header");
         } else {
-            System.out.println("No JWT found in request*******");
+            log.debug("No JWT found in Authorization header");
         }
 
         if (jwt != null && tokenProvider.validateToken(jwt)) {
-            String username = tokenProvider.getUsernameFromJWT(jwt);
+            String email = tokenProvider.getUsernameFromJWT(jwt);
+            log.info("JWT validated for user email={}", email);
 
-            System.out.println("JWT validated for user: **************" + username);
-
-            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-
-            System.out.println("Authorities from userDetails: ***************" + userDetails.getAuthorities());
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new IllegalStateException("Authenticated user not found for email: " + email));
+            CustomUserDetails userDetails = new CustomUserDetails(user);
+            log.debug("Loaded authenticated user={} id={} authorities={}", email, user.getId(),
+                    userDetails.getAuthorities());
 
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                     userDetails,
@@ -57,8 +61,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
-
-            System.out.println("Authentication set in SecurityContext*******************");
+            log.info("Authentication set in SecurityContext for user={}", email);
+        } else if (jwt != null) {
+            log.warn("JWT validation failed for token");
         }
 
         filterChain.doFilter(request, response);

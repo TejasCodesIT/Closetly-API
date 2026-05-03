@@ -101,6 +101,106 @@ public class EmailService {
         mailSender.send(message);
     }
 
+    public void sendOrderCancelledByCustomerEmail(
+            String sellerEmail,
+            String productTitle,
+            String customerName,
+            String orderId,
+            String reason) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(sellerEmail);
+        message.setSubject("Order cancelled by customer: " + productTitle);
+        message.setText("""
+                An order has been cancelled by the customer.
+
+                Order ID: %s
+                Product: %s
+                Customer: %s
+                Reason: %s
+                """.formatted(
+                safe(orderId),
+                safe(productTitle),
+                safe(customerName),
+                safe(reason)));
+        mailSender.send(message);
+    }
+
+    public void sendOrderCancelledBySellerEmail(
+            String customerEmail,
+            String productTitle,
+            String sellerName,
+            String orderId,
+            String reason) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(customerEmail);
+        message.setSubject("Order cancelled by seller: " + productTitle);
+        message.setText("""
+                Your order has been cancelled by the seller.
+
+                Order ID: %s
+                Product: %s
+                Seller: %s
+                Reason: %s
+                """.formatted(
+                safe(orderId),
+                safe(productTitle),
+                safe(sellerName),
+                safe(reason)));
+        mailSender.send(message);
+    }
+
+    public void sendBookingCancelledByCustomerEmail(
+            String ownerEmail,
+            String productTitle,
+            String customerName,
+            LocalDate startDate,
+            LocalDate endDate,
+            String reason) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(ownerEmail);
+        message.setSubject("Booking cancelled by customer: " + productTitle);
+        message.setText("""
+                A booking has been cancelled by the customer.
+
+                Product: %s
+                Customer: %s
+                Dates: %s to %s
+                Reason: %s
+                """.formatted(
+                safe(productTitle),
+                safe(customerName),
+                safe(startDate),
+                safe(endDate),
+                safe(reason)));
+        mailSender.send(message);
+    }
+
+    public void sendBookingCancelledBySellerEmail(
+            String customerEmail,
+            String productTitle,
+            String sellerName,
+            LocalDate startDate,
+            LocalDate endDate,
+            String reason) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(customerEmail);
+        message.setSubject("Booking cancelled by seller: " + productTitle);
+        message.setText("""
+                Your booking has been cancelled by the seller.
+
+                Product: %s
+                Seller: %s
+                Dates: %s to %s
+                Reason: %s
+                """.formatted(
+                safe(productTitle),
+                safe(sellerName),
+                safe(startDate),
+                safe(endDate),
+                safe(reason)));
+        mailSender.send(message);
+    }
+
     public void sendEmailVerificationEmail(String toEmail, String verificationToken) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(toEmail);
