@@ -1,6 +1,7 @@
 package com.closetly.closetly_backend.product.dto;
 
 import com.closetly.closetly_backend.product.entity.ProductType;
+import com.closetly.closetly_backend.product.entity.Size;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
@@ -13,7 +14,7 @@ public class ProductDTO {
     private String description;
     private String brand;
     private String category;
-    private String size;
+    private Size size;
     private String condition;
     private ProductType productType;
     private Double salePrice;

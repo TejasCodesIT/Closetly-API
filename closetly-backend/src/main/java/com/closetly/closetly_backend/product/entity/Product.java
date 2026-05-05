@@ -38,7 +38,8 @@ public class Product {
     @Column(nullable = false)
     private String category;
 
-    private String size;
+    @Enumerated(EnumType.STRING)
+    private Size size;
     private String productCondition;
 
     @Enumerated(EnumType.STRING)

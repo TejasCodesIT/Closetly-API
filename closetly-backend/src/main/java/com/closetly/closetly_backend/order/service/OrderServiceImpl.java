@@ -389,18 +389,20 @@ public class OrderServiceImpl implements OrderService {
             // Validate and set status with debug logging
             validateAndSetOrderStatus(order);
 
+            // TODO: Stock will be decreased when order is approved by seller
             // Update product quantities for BUY items (decrement stock)
-            for (OrderItem item : orderItems) {
-                if (item.getType() == OrderItemType.BUY) {
-                    Product product = item.getProduct();
-                    Integer currentQty = product.getQuantity();
-                    if (currentQty != null && currentQty >= item.getQuantity()) {
-                        product.setQuantity(currentQty - item.getQuantity());
-                    } else {
-                        throw new IllegalStateException("Insufficient stock for product: " + product.getTitle());
-                    }
-                }
-            }
+            // for (OrderItem item : orderItems) {
+            // if (item.getType() == OrderItemType.BUY) {
+            // Product product = item.getProduct();
+            // Integer currentQty = product.getQuantity();
+            // if (currentQty != null && currentQty >= item.getQuantity()) {
+            // product.setQuantity(currentQty - item.getQuantity());
+            // } else {
+            // throw new IllegalStateException("Insufficient stock for product: " +
+            // product.getTitle());
+            // }
+            // }
+            // }
 
             // Save the order (cascade will save order items)
             Order savedOrder = orderRepository.save(order);
@@ -696,28 +698,46 @@ public class OrderServiceImpl implements OrderService {
             return;
         }
 
-        Optional<ChatRoom> existingRoom = chatRoomRepository.findByOrderId(order.getId());
-        if (existingRoom.isPresent()) {
-            ChatRoom room = existingRoom.get();
-            if (room.isDeleted()) {
-                room.setDeleted(false);
-                chatRoomRepository.saveAndFlush(room);
-            }
-            return;
-        }
-
-        Optional<ChatRoom> deletedRoom = chatRoomRepository.findByOrderIdIncludeDeleted(order.getId());
-        if (deletedRoom.isPresent()) {
-            ChatRoom room = deletedRoom.get();
-            room.setDeleted(false);
-            chatRoomRepository.saveAndFlush(room);
-            return;
-        }
-
         Long productId = order.getOrderItems().stream()
                 .filter(item -> item.getProduct() != null)
                 .map(item -> item.getProduct().getId())
                 .findFirst().orElse(null);
+
+        if (productId == null) {
+            return;
+        }
+
+        Optional<ChatRoom> existingRoom = chatRoomRepository.findByProductIdAndBuyerIdAndSellerId(
+                productId,
+                order.getCustomer().getId(),
+                order.getSeller().getId());
+
+        if (existingRoom.isPresent()) {
+            ChatRoom room = existingRoom.get();
+            if (room.isDeleted()) {
+                room.setDeleted(false);
+            }
+            if (room.getOrder() == null) {
+                room.setOrder(order);
+            }
+            chatRoomRepository.saveAndFlush(room);
+            return;
+        }
+
+        Optional<ChatRoom> deletedRoom = chatRoomRepository.findByProductIdAndBuyerIdAndSellerIdIncludeDeleted(
+                productId,
+                order.getCustomer().getId(),
+                order.getSeller().getId());
+
+        if (deletedRoom.isPresent()) {
+            ChatRoom room = deletedRoom.get();
+            room.setDeleted(false);
+            if (room.getOrder() == null) {
+                room.setOrder(order);
+            }
+            chatRoomRepository.saveAndFlush(room);
+            return;
+        }
 
         ChatRoom newRoom = ChatRoom.builder()
                 .order(order)
@@ -806,7 +826,24 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // Reject the entire order when any item is rejected
-        orderItem.getOrder().setStatus(OrderStatus.CANCELLED);
+        orderItem.getOrder().setStatus(OrderStatus.REJECTED);
+
+        // Restore stock and make product available again
+        for (OrderItem item : orderItem.getOrder().getOrderItems()) {
+            if (item.getType() == OrderItemType.BUY) {
+                if (item.getProductVariant() != null) {
+                    item.getProductVariant().increaseQuantity(item.getQuantity());
+                } else {
+                    Product product = item.getProduct();
+                    Integer currentQty = product.getQuantity();
+                    if (currentQty != null) {
+                        product.setQuantity(currentQty + item.getQuantity());
+                    }
+                }
+                item.getProduct().setForSale(true);
+            }
+        }
+
         orderRepository.save(orderItem.getOrder());
 
         return toSellerOrderItemDto(orderItem);
@@ -889,6 +926,8 @@ public class OrderServiceImpl implements OrderService {
                         product.setQuantity(currentQty + item.getQuantity());
                     }
                 }
+                // Make product available again
+                item.getProduct().setForSale(true);
             }
         }
 

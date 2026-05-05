@@ -1,6 +1,7 @@
 package com.closetly.closetly_backend.product.dto;
 
 import com.closetly.closetly_backend.product.entity.ProductType;
+import com.closetly.closetly_backend.product.entity.Size;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -21,7 +22,7 @@ public class ProductRequestDTO {
     @NotBlank(message = "Category is required")
     private String category;
 
-    private String size;
+    private Size size;
     private String condition;
 
     private Double salePrice;
