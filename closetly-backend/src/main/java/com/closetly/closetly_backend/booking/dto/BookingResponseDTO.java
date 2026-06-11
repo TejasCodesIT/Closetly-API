@@ -12,9 +12,14 @@ public class BookingResponseDTO {
     private String productBrand;
     private String productImageUrl;
     private Long customerId;
+    private String customerName;
+    private String sellerName;
     private Long sellerId;
     private LocalDate startDate;
     private LocalDate endDate;
     private String status;
     private String message;
+    private String cancelledBy;
+    private String cancelReason;
+    private LocalDate cancelledAt;
 }

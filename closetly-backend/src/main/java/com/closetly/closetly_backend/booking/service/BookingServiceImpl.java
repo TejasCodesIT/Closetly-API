@@ -198,10 +198,10 @@ public class BookingServiceImpl implements BookingService {
 
         // Update booking status and cancellation details
         if (isCustomer) {
-            booking.setStatus(BookingStatus.CANCELLED_BY_CUSTOMER);
+            booking.setStatus(BookingStatus.CANCELLED);
             booking.setCancelledBy(Booking.CancelledBy.CUSTOMER);
         } else {
-            booking.setStatus(BookingStatus.CANCELLED_BY_SELLER);
+            booking.setStatus(BookingStatus.CANCELLED);
             booking.setCancelledBy(Booking.CancelledBy.SELLER);
         }
 
@@ -257,11 +257,16 @@ public class BookingServiceImpl implements BookingService {
         dto.setProductImageUrl(b.getProduct().getPrimaryImageUrl());
 
         dto.setCustomerId(b.getCustomer().getId());
+        dto.setCustomerName(b.getCustomer().getFullName());
         dto.setSellerId(b.getProduct().getSeller() != null ? b.getProduct().getSeller().getId() : null);
         dto.setStartDate(b.getStartDate());
         dto.setEndDate(b.getEndDate());
         dto.setStatus(b.getStatus().name());
         dto.setMessage(b.getMessage());
+        dto.setCancelReason(b.getCancelReason());
+        dto.setSellerName(b.getProduct().getSeller() != null ? b.getProduct().getSeller().getFullName() : null);
+        dto.setCancelledBy(b.getCancelledBy() != null ? b.getCancelledBy().name() : null);
+        dto.setCancelledAt(b.getCancelledAt() != null ? b.getCancelledAt().toLocalDate() : null);
         return dto;
     }
 
