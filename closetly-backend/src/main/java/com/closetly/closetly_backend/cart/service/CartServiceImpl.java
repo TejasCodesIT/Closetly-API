@@ -33,14 +33,10 @@ public class CartServiceImpl implements CartService {
     @Override
     @Transactional
     public CartItemDTO addToCart(AddToCartRequestDTO request, String userEmail) {
-        System.out.println("DEBUG: addToCart called with request: " + request);
-        System.out.println("DEBUG: userEmail: " + userEmail);
-        System.out.println("DEBUG: request.type: " + (request.getType() != null ? request.getType() : "NULL"));
-
+      
         // Verify authenticated user
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated() || !auth.getName().equals(userEmail)) {
-            System.out.println("DEBUG: Authentication failed. auth: " + auth + ", userEmail: " + userEmail);
             throw new AccessDeniedException("Not authenticated as the given user");
         }
 
@@ -63,7 +59,6 @@ public class CartServiceImpl implements CartService {
 
         // Check if item already exists in cart (same product, same type)
         CartItem.CartItemType cartItemType = CartItem.CartItemType.valueOf(request.getType().name());
-        System.out.println("DEBUG: cartItemType: " + cartItemType);
         boolean exists = cartItemRepository.existsByUserIdAndProductIdAndType(
                 user.getId(), product.getId(), cartItemType);
 

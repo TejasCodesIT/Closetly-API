@@ -281,18 +281,11 @@ public class ChatServiceImpl implements ChatService {
     public void assertUserCanAccessRoom(Long chatRoomId, Long userId) {
         ChatRoom room = requireRoom(chatRoomId);
 
-        System.out.println("🔍 CHECKING ACCESS:");
-        System.out.println("   Current user ID: " + userId);
-        System.out.println("   Room buyer ID: " + room.getBuyerId());
-        System.out.println("   Room seller ID: " + room.getSellerId());
-
         if ((room.getBuyerId() == null || !userId.equals(room.getBuyerId())) &&
                 (room.getSellerId() == null || !userId.equals(room.getSellerId()))) {
-            System.out.println("❌ ACCESS DENIED: User not part of this chat");
             throw new AccessDeniedException("Not part of this chat");
         }
 
-        System.out.println("✅ ACCESS GRANTED");
     }
 
     private MessageDTO toDto(Message message) {

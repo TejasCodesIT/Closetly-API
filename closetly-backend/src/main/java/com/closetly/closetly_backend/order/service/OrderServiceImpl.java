@@ -55,8 +55,6 @@ public class OrderServiceImpl implements OrderService {
         if (order.getStatus() == null) {
             order.setStatus(OrderStatus.PLACED);
         }
-        // Debug logging
-        System.out.println("Saving Order with status: " + order.getStatus());
     }
 
     @Override
@@ -114,8 +112,7 @@ public class OrderServiceImpl implements OrderService {
         validateAndSetOrderStatus(order);
 
         Order saved = orderRepository.save(order);
-        System.out.println("Order saved (legacy one-item): " + saved.getId() + " status=" + saved.getStatus()
-                + " customer=" + saved.getCustomer().getId() + " seller=" + saved.getSeller().getId());
+    
         return toLegacyDto(saved);
     }
 
@@ -242,8 +239,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         Order saved = orderRepository.save(order);
-        System.out.println("Order saved: " + saved.getId() + " status=" + saved.getStatus() + " customer="
-                + saved.getCustomer().getId() + " seller=" + saved.getSeller().getId());
+       
         return toDto(saved);
     }
 
@@ -263,18 +259,14 @@ public class OrderServiceImpl implements OrderService {
             throw new IllegalStateException("Cart is empty. Add items to cart before placing order.");
         }
 
-        System.out.println("==== CART ITEMS DEBUG ====");
         cartItems.forEach(item -> {
-            System.out.println(
-                    "Product: " + item.getProduct().getId() +
-                            " | Seller: " + item.getProduct().getSeller().getId());
+           
         });
 
         // 4. Group cart items by seller
         Map<Long, List<CartItem>> itemsBySeller = cartItems.stream()
                 .collect(Collectors.groupingBy(item -> {
                     Long sellerId = item.getProduct().getSeller().getId();
-                    System.out.println("Grouping Seller ID: " + sellerId);
                     return sellerId;
                 }));
         // 5. Extract product IDs and fetch all products in a single batch query
@@ -406,9 +398,7 @@ public class OrderServiceImpl implements OrderService {
 
             // Save the order (cascade will save order items)
             Order savedOrder = orderRepository.save(order);
-            System.out.println("Order saved (checkout): " + savedOrder.getId() + " status=" + savedOrder.getStatus()
-                    + " customer=" + savedOrder.getCustomer().getId() + " seller=" + savedOrder.getSeller().getId());
-
+           
             orders.add(savedOrder);
         }
 

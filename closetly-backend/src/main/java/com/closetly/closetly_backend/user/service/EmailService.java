@@ -26,7 +26,6 @@ public class EmailService {
                     "If you didn't request this password reset, please ignore this email.");
 
             mailSender.send(message);
-            System.out.println("Password reset email sent successfully to: " + toEmail);
         } catch (MailAuthenticationException e) {
             System.err.println("Email authentication failed: " + e.getMessage());
             throw new RuntimeException("Email authentication failed. Please check SMTP credentials.");

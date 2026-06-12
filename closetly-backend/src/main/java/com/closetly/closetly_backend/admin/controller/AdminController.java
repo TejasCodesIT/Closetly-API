@@ -47,9 +47,7 @@ public class AdminController {
     public ResponseEntity<DashboardOverviewDTO> getDashboard() {
         DashboardOverviewDTO overview = adminService.getDashboardOverview();
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        System.out.println("Controller auth: " + auth);
-        System.out.println("Controller authorities:*********************************** " + auth.getAuthorities());
-        return ResponseEntity.ok(overview);
+       return ResponseEntity.ok(overview);
     }
 
     /**
@@ -322,10 +320,6 @@ public class AdminController {
         // DEBUG: Verify data is being sent
         if (!bookings.isEmpty()) {
             BookingDTO first = bookings.getContent().get(0);
-            System.out.println("[DEBUG] First booking DTO: id=" + first.getId() +
-                    ", productTitle=" + first.getProductTitle() +
-                    ", productBrand=" + first.getProductBrand() +
-                    ", productImageUrl=" + first.getProductImageUrl());
         }
 
         return ResponseEntity.ok(bookings);

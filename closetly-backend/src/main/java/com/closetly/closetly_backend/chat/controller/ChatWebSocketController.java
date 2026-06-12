@@ -28,13 +28,10 @@ public class ChatWebSocketController {
     public void sendMessage(@Valid MessageDTO message, Authentication authentication) {
 
         if (authentication == null || !authentication.isAuthenticated()) {
-            System.out.println("❌ AUTHENTICATION IS NULL OR NOT AUTHENTICATED");
             throw new AccessDeniedException("Unauthorized");
         }
 
         String username = authentication.getName();
-        System.out.println("🔥 AUTHENTICATION TYPE: " + authentication.getClass().getSimpleName());
-        System.out.println("🔥 AUTHENTICATION NAME: " + username);
 
         log.info("🔥 FINAL USER: {}", username);
 

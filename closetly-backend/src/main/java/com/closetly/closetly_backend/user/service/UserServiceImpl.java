@@ -180,11 +180,7 @@ public class UserServiceImpl implements UserService {
                 if (email == null || email.trim().isEmpty()) {
                         throw new IllegalArgumentException("Email is required");
                 }
-                System.out.println("[DEBUG] updateProfile called for email: " + email);
-                System.out.println("[DEBUG] Incoming DTO: fullName=" + request.getFullName() + ", phoneNumber="
-                                + request.getPhoneNumber() + ", latitude=" + request.getLatitude() + ", longitude="
-                                + request.getLongitude());
-
+              
                 User user = userRepository.findByEmail(email)
                                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
@@ -201,16 +197,11 @@ public class UserServiceImpl implements UserService {
                         user.setLongitude(request.getLongitude());
                 }
 
-                System.out.println("[DEBUG] User before save: fullName=" + user.getFullName() + ", phoneNumber="
-                                + user.getPhoneNumber() + ", latitude=" + user.getLatitude() + ", longitude="
-                                + user.getLongitude());
+              
                 user = userRepository.save(user);
-                System.out.println("[DEBUG] User after save: fullName=" + user.getFullName() + ", phoneNumber="
-                                + user.getPhoneNumber());
-
+               
                 UserProfileDTO result = toProfileDto(user);
-                System.out.println("[DEBUG] Returning DTO: fullName=" + result.getFullName() + ", phoneNumber="
-                                + result.getPhoneNumber());
+              
                 return result;
         }
 

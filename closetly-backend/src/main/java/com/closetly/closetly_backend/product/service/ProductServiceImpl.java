@@ -724,23 +724,18 @@ public class ProductServiceImpl implements ProductService {
 
     private static ProductType resolveProductType(ProductType explicit, boolean isForRent, boolean isForSale) {
         if (explicit != null) {
-            System.out.println("[resolveProductType] Using explicit productType: " + explicit);
             return explicit;
         }
         // Fallback to boolean flags if no explicit productType
         if (isForRent && isForSale) {
-            System.out.println("[resolveProductType] Both rent and sale flags true -> returning BOTH");
             return ProductType.BOTH;
         }
         if (isForRent) {
-            System.out.println("[resolveProductType] Only rent flag true -> returning RENT");
             return ProductType.RENT;
         }
         if (isForSale) {
-            System.out.println("[resolveProductType] Only sale flag true -> returning BUY");
             return ProductType.BUY;
         }
-        System.out.println("[resolveProductType] No flags set -> defaulting to RENT");
         return ProductType.RENT;
     }
 
