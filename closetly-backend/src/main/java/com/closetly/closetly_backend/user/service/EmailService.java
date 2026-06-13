@@ -14,8 +14,9 @@ import java.time.LocalDate;
 public class EmailService {
 
     private final JavaMailSender mailSender;
+
     @Value("${app.base-url}")
-private String baseUrl;
+    private String baseUrl;
 
     public void sendPasswordResetEmail(String toEmail, String resetToken) {
         try {
@@ -202,31 +203,32 @@ private String baseUrl;
         mailSender.send(message);
     }
 
-    // public void sendEmailVerificationEmail(String toEmail, String verificationToken) {
-    //     SimpleMailMessage message = new SimpleMailMessage();
-    //     message.setTo(toEmail);
-    //     message.setSubject("Verify your Closetly email");
-    //     message.setText("Verify your email by clicking this link:\n\n" +
-    //             "http://localhost:8080/auth/verify?token=" + verificationToken + "\n\n" +
-    //             "If you didn't create this account, you can ignore this email.");
-    //     mailSender.send(message);
+    // public void sendEmailVerificationEmail(String toEmail, String
+    // verificationToken) {
+    // SimpleMailMessage message = new SimpleMailMessage();
+    // message.setTo(toEmail);
+    // message.setSubject("Verify your Closetly email");
+    // message.setText("Verify your email by clicking this link:\n\n" +
+    // "http://localhost:8080/auth/verify?token=" + verificationToken + "\n\n" +
+    // "If you didn't create this account, you can ignore this email.");
+    // mailSender.send(message);
     // }
 
     public void sendEmailVerificationEmail(String toEmail, String verificationToken) {
-    SimpleMailMessage message = new SimpleMailMessage();
-    message.setTo(toEmail);
-    message.setSubject("Verify your Closetly email");
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(toEmail);
+        message.setSubject("Verify your Closetly email");
 
-    String verificationUrl = baseUrl + "/api/auth/verify?token=" + verificationToken;
+        String verificationUrl = baseUrl + "/api/auth/verify?token=" + verificationToken;
 
-    message.setText(
-            "Verify your email by clicking this link:\n\n" +
-            verificationUrl +
-            "\n\nIf you didn't create this account, you can ignore this email."
-    );
+        message.setText(
+                "Verify your email by clicking this link:\n\n" +
+                        verificationUrl +
+                        "\n\nIf you didn't create this account, you can ignore this email.");
 
-    mailSender.send(message);
-}
+        mailSender.send(message);
+    }
+
     private static String safe(Object val) {
         return val == null ? "-" : val.toString();
     }
