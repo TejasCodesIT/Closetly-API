@@ -224,7 +224,10 @@ public class EmailService {
 
     public void sendEmailVerificationEmail(String toEmail, String verificationToken) {
 
-        String verificationUrl = baseUrl + "/api/auth/verify?token=" + verificationToken;
+    try {
+
+        String verificationUrl =
+                baseUrl + "/api/auth/verify?token=" + verificationToken;
 
         System.out.println("EMAIL TO = " + toEmail);
         System.out.println("VERIFICATION URL = " + verificationUrl);
@@ -239,7 +242,15 @@ public class EmailService {
         mailSender.send(message);
 
         System.out.println("EMAIL SENT SUCCESSFULLY");
+
+    } catch (Exception e) {
+
+        System.out.println("EMAIL ERROR:");
+        e.printStackTrace();
+
+        throw e;
     }
+}
 
     private static String safe(Object val) {
         return val == null ? "-" : val.toString();
