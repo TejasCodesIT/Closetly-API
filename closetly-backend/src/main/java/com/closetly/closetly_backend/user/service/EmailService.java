@@ -6,6 +6,9 @@ import org.springframework.mail.MailSendException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
+
+import jakarta.annotation.PostConstruct;
+
 import org.springframework.beans.factory.annotation.Value;
 import java.time.LocalDate;
 
@@ -18,13 +21,18 @@ public class EmailService {
     @Value("${app.base-url}")
     private String baseUrl;
 
+    @PostConstruct
+    public void test() {
+        System.out.println("BASE URL = " + baseUrl);
+    }
+
     public void sendPasswordResetEmail(String toEmail, String resetToken) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setTo(toEmail);
             message.setSubject("Closetly Password Reset");
-            message.setText("Click the link below to reset your password:\n\n" +
-                    "http://localhost:4200/reset-password?token=" + resetToken + "\n\n" +
+            message.setText("Click the link below to reset your password:\n\n" + baseUrl +
+                    "/reset-password?token=" + resetToken + "\n\n" +
                     "This link will expire in 15 minutes.\n\n" +
                     "If you didn't request this password reset, please ignore this email.");
 
