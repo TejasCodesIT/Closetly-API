@@ -41,7 +41,7 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
         AuthResponse authResponse = userService.login(request);
-        
+
         // Set HttpOnly cookie with JWT token
         Cookie cookie = new Cookie("accessToken", authResponse.getAccessToken());
         cookie.setHttpOnly(true);
@@ -49,7 +49,7 @@ public class AuthController {
         cookie.setPath("/");
         cookie.setMaxAge(3600); // 1 hour expiration
         response.addCookie(cookie);
-        
+
         return ResponseEntity.ok(authResponse);
     }
 
@@ -125,7 +125,7 @@ public class AuthController {
         cookie.setPath("/");
         cookie.setMaxAge(0); // Immediately expire the cookie
         response.addCookie(cookie);
-        
+
         return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
 
