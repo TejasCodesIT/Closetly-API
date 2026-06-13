@@ -223,18 +223,22 @@ public class EmailService {
     // }
 
     public void sendEmailVerificationEmail(String toEmail, String verificationToken) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(toEmail);
-        message.setSubject("Verify your Closetly email");
 
         String verificationUrl = baseUrl + "/api/auth/verify?token=" + verificationToken;
 
+        System.out.println("EMAIL TO = " + toEmail);
+        System.out.println("VERIFICATION URL = " + verificationUrl);
+
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(toEmail);
+        message.setSubject("Verify your Closetly email");
         message.setText(
-                "Verify your email by clicking this link:\n\n" +
-                        verificationUrl +
-                        "\n\nIf you didn't create this account, you can ignore this email.");
+                "Verify your email by clicking this link:\n\n"
+                        + verificationUrl);
 
         mailSender.send(message);
+
+        System.out.println("EMAIL SENT SUCCESSFULLY");
     }
 
     private static String safe(Object val) {
