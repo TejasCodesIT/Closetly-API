@@ -60,8 +60,12 @@ public class UserServiceImpl implements UserService {
                                 .build();
                 user = Objects.requireNonNull(userRepository.save(user));
 
-                emailService.sendEmailVerificationEmail(user.getEmail(), verificationToken);
-
+                // emailService.sendEmailVerificationEmail(user.getEmail(), verificationToken);
+                try {
+                        emailService.sendEmailVerificationEmail(user.getEmail(), verificationToken);
+                } catch (Exception e) {
+                        e.printStackTrace();
+                }
                 AuthResponse resp = new AuthResponse();
                 // refresh token generation could be added later
                 return resp;
@@ -180,7 +184,7 @@ public class UserServiceImpl implements UserService {
                 if (email == null || email.trim().isEmpty()) {
                         throw new IllegalArgumentException("Email is required");
                 }
-              
+
                 User user = userRepository.findByEmail(email)
                                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
@@ -197,11 +201,10 @@ public class UserServiceImpl implements UserService {
                         user.setLongitude(request.getLongitude());
                 }
 
-              
                 user = userRepository.save(user);
-               
+
                 UserProfileDTO result = toProfileDto(user);
-              
+
                 return result;
         }
 
