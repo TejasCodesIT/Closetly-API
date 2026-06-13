@@ -8,6 +8,8 @@ import com.closetly.closetly_backend.user.dto.ForgotPasswordRequest;
 import com.closetly.closetly_backend.user.dto.ResetPasswordRequest;
 import com.closetly.closetly_backend.user.entity.User;
 import com.closetly.closetly_backend.user.service.UserService;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -37,8 +39,18 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        return ResponseEntity.ok(userService.login(request));
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
+        AuthResponse authResponse = userService.login(request);
+        
+        // Set HttpOnly cookie with JWT token
+        Cookie cookie = new Cookie("accessToken", authResponse.getAccessToken());
+        cookie.setHttpOnly(true);
+        cookie.setSecure(true); // Set to true in production with HTTPS
+        cookie.setPath("/");
+        cookie.setMaxAge(3600); // 1 hour expiration
+        response.addCookie(cookie);
+        
+        return ResponseEntity.ok(authResponse);
     }
 
     @GetMapping("/verify")
@@ -102,6 +114,19 @@ public class AuthController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("valid", false, "message", "Invalid token"));
         }
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(HttpServletResponse response) {
+        // Clear the JWT cookie
+        Cookie cookie = new Cookie("accessToken", null);
+        cookie.setHttpOnly(true);
+        cookie.setSecure(true); // Set to true in production with HTTPS
+        cookie.setPath("/");
+        cookie.setMaxAge(0); // Immediately expire the cookie
+        response.addCookie(cookie);
+        
+        return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
 
 }

@@ -273,9 +273,9 @@
                         <bootclasspath>${sun.boot.class.path}</bootclasspath>
                         <additionalparam>
                             -quiet
-                            -federate JDK http://download.oracle.com/javase/6/docs/api/index.html?
+                            -federate JDK http://download.oracle.com/javase/6/docs/index.html?
                             -federate Guice http://google-guice.googlecode.com/svn/trunk/javadoc/
-                            -federationxml JDK http://doclava.googlecode.com/svn/static/api/openjdk-6.xml
+                            -federationxml JDK http://doclava.googlecode.com/svn/static/openjdk-6.xml
                             -hdf project.name "${project.name}"
                             -d ${project.build.directory}/apidocs
                         </additionalparam>

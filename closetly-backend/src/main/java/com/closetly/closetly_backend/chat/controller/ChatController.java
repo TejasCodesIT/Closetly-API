@@ -37,7 +37,8 @@ public class ChatController {
     public ResponseEntity<ChatRoomDTO> createOrGetByBooking(
             @Valid @RequestBody CreateOrGetChatByBookingRequestDTO request,
             Authentication authentication) {
-        return ResponseEntity.ok(chatService.createOrGetRoomByBooking(request.getBookingId(), authentication.getName()));
+        return ResponseEntity
+                .ok(chatService.createOrGetRoomByBooking(request.getBookingId(), authentication.getName()));
     }
 
     /**
@@ -46,7 +47,7 @@ public class ChatController {
      */
     @PostMapping("/room")
     public ResponseEntity<ChatRoomDTO> createRoom(@Valid @RequestBody CreateChatRoomRequestDTO request,
-                                                  Authentication authentication) {
+            Authentication authentication) {
         return ResponseEntity.ok(chatService.createOrGetRoom(request, authentication.getName()));
     }
 
@@ -64,7 +65,7 @@ public class ChatController {
      */
     @GetMapping("/room/{chatRoomId}")
     public ResponseEntity<List<MessageDTO>> messages(@PathVariable Long chatRoomId,
-                                                     Authentication authentication) {
+            Authentication authentication) {
         return ResponseEntity.ok(chatService.getMessages(chatRoomId, authentication.getName()));
     }
 }

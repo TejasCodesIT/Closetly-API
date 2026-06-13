@@ -102,7 +102,7 @@ com.fasterxml.classmate.*;version=${project.version}
                     <source>${version.jdk}</source>
                     <encoding>UTF-8</encoding>
                     <links>
-	 	      <link>https://docs.oracle.com/javase/8/docs/api/</link>
+	 	      <link>https://docs.oracle.com/javase/8/docs/</link>
                     </links>
                  </configuration>
                  <executions>
