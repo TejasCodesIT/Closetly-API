@@ -272,27 +272,27 @@
     <project.reporting.outputEncoding>${commons.encoding}</project.reporting.outputEncoding>
 
     <!-- Javadoc link to Java API. Default is Java 8; components can override to other versions -->
-    <commons.javadoc6.java.link>https://docs.oracle.com/javase/6/docs/api/</commons.javadoc6.java.link>
-    <commons.javadoc7.java.link>https://docs.oracle.com/javase/7/docs/api/</commons.javadoc7.java.link>
-    <commons.javadoc8.java.link>https://docs.oracle.com/javase/8/docs/api/</commons.javadoc8.java.link>
-    <commons.javadoc9.java.link>https://docs.oracle.com/javase/9/docs/api/</commons.javadoc9.java.link>
-    <commons.javadoc10.java.link>https://docs.oracle.com/javase/10/docs/api/</commons.javadoc10.java.link>
-    <commons.javadoc11.java.link>https://docs.oracle.com/en/java/javase/11/docs/api/</commons.javadoc11.java.link>
-    <commons.javadoc12.java.link>https://docs.oracle.com/en/java/javase/12/docs/api/</commons.javadoc12.java.link>
-    <commons.javadoc13.java.link>https://docs.oracle.com/en/java/javase/13/docs/api/</commons.javadoc13.java.link>
-    <commons.javadoc14.java.link>https://docs.oracle.com/en/java/javase/14/docs/api/</commons.javadoc14.java.link>
-    <commons.javadoc15.java.link>https://docs.oracle.com/en/java/javase/15/docs/api/</commons.javadoc15.java.link>
-    <commons.javadoc16.java.link>https://docs.oracle.com/en/java/javase/16/docs/api/</commons.javadoc16.java.link>
-    <commons.javadoc17.java.link>https://docs.oracle.com/en/java/javase/17/docs/api/</commons.javadoc17.java.link>
-    <commons.javadoc18.java.link>https://docs.oracle.com/en/java/javase/18/docs/api/</commons.javadoc18.java.link>
-    <commons.javadoc19.java.link>https://docs.oracle.com/en/java/javase/19/docs/api/</commons.javadoc19.java.link>
-    <commons.javadoc20.java.link>https://docs.oracle.com/en/java/javase/20/docs/api/</commons.javadoc20.java.link>
+    <commons.javadoc6.java.link>https://docs.oracle.com/javase/6/docs/</commons.javadoc6.java.link>
+    <commons.javadoc7.java.link>https://docs.oracle.com/javase/7/docs/</commons.javadoc7.java.link>
+    <commons.javadoc8.java.link>https://docs.oracle.com/javase/8/docs/</commons.javadoc8.java.link>
+    <commons.javadoc9.java.link>https://docs.oracle.com/javase/9/docs/</commons.javadoc9.java.link>
+    <commons.javadoc10.java.link>https://docs.oracle.com/javase/10/docs/</commons.javadoc10.java.link>
+    <commons.javadoc11.java.link>https://docs.oracle.com/en/java/javase/11/docs/</commons.javadoc11.java.link>
+    <commons.javadoc12.java.link>https://docs.oracle.com/en/java/javase/12/docs/</commons.javadoc12.java.link>
+    <commons.javadoc13.java.link>https://docs.oracle.com/en/java/javase/13/docs/</commons.javadoc13.java.link>
+    <commons.javadoc14.java.link>https://docs.oracle.com/en/java/javase/14/docs/</commons.javadoc14.java.link>
+    <commons.javadoc15.java.link>https://docs.oracle.com/en/java/javase/15/docs/</commons.javadoc15.java.link>
+    <commons.javadoc16.java.link>https://docs.oracle.com/en/java/javase/16/docs/</commons.javadoc16.java.link>
+    <commons.javadoc17.java.link>https://docs.oracle.com/en/java/javase/17/docs/</commons.javadoc17.java.link>
+    <commons.javadoc18.java.link>https://docs.oracle.com/en/java/javase/18/docs/</commons.javadoc18.java.link>
+    <commons.javadoc19.java.link>https://docs.oracle.com/en/java/javase/19/docs/</commons.javadoc19.java.link>
+    <commons.javadoc20.java.link>https://docs.oracle.com/en/java/javase/20/docs/</commons.javadoc20.java.link>
 
     <commons.javadoc.java.link>${commons.javadoc8.java.link}</commons.javadoc.java.link>
 
-    <commons.javadoc.javaee5.link>https://docs.oracle.com/javaee/5/api/</commons.javadoc.javaee5.link>
-    <commons.javadoc.javaee6.link>https://docs.oracle.com/javaee/6/api/</commons.javadoc.javaee6.link>
-    <commons.javadoc.javaee7.link>https://docs.oracle.com/javaee/7/api/</commons.javadoc.javaee7.link>
+    <commons.javadoc.javaee5.link>https://docs.oracle.com/javaee/5/</commons.javadoc.javaee5.link>
+    <commons.javadoc.javaee6.link>https://docs.oracle.com/javaee/6/</commons.javadoc.javaee6.link>
+    <commons.javadoc.javaee7.link>https://docs.oracle.com/javaee/7/</commons.javadoc.javaee7.link>
 
     <commons.javadoc.javaee.link>${commons.javadoc.javaee6.link}</commons.javadoc.javaee.link>
 

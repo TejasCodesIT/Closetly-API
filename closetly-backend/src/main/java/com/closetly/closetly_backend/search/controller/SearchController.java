@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/search")
+@RequestMapping("/search")
 @RequiredArgsConstructor
 public class SearchController {
 
@@ -32,4 +32,3 @@ public class SearchController {
         return ResponseEntity.ok(searchHistoryService.getMyHistory(authentication.getName()));
     }
 }
-

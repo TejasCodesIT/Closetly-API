@@ -205,7 +205,7 @@ public class EmailService {
         message.setTo(toEmail);
         message.setSubject("Verify your Closetly email");
         message.setText("Verify your email by clicking this link:\n\n" +
-                "http://localhost:8080/api/auth/verify?token=" + verificationToken + "\n\n" +
+                "http://localhost:8080/auth/verify?token=" + verificationToken + "\n\n" +
                 "If you didn't create this account, you can ignore this email.");
         mailSender.send(message);
     }

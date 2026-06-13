@@ -673,8 +673,8 @@
           <quiet>true</quiet>
           <notimestamp>true</notimestamp>
           <links>
-            <link>https://docs.oracle.com/javase/8/docs/api/</link>
-            <link>http://docs.oracle.com/javaee/6/api/</link>
+            <link>https://docs.oracle.com/javase/8/docs/</link>
+            <link>http://docs.oracle.com/javaee/6/</link>
           </links>
           <archive>
             <manifest>

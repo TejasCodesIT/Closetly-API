@@ -39,16 +39,16 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/auth/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/auth/verify").permitAll()
-                        .requestMatchers("/api/chat/**").authenticated()
-                        .requestMatchers("/api/users/profile", "/api/users/upload-profile-image",
-                                "/api/users/change-password")
+                        .requestMatchers("/admin/**").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/auth/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/auth/verify").permitAll()
+                        .requestMatchers("/chat/**").authenticated()
+                        .requestMatchers("/users/profile", "/users/upload-profile-image",
+                                "/users/change-password")
                         .authenticated()
-                        .requestMatchers("/api/notifications/me").authenticated()
-                        .requestMatchers("/api/search/history").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/search").authenticated()
+                        .requestMatchers("/notifications/me").authenticated()
+                        .requestMatchers("/search/history").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/search").authenticated()
                         .anyRequest().permitAll())
                 // ✅ TASK 4: Proper exception handling for auth errors
                 .exceptionHandling(ex -> ex
