@@ -14,6 +14,7 @@ import com.closetly.closetly_backend.user.entity.User;
 import com.closetly.closetly_backend.user.repository.UserRepository;
 import com.closetly.closetly_backend.user.repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -35,6 +36,9 @@ public class UserServiceImpl implements UserService {
         private final JwtTokenProvider tokenProvider;
         private final RoleRepository roleRepository;
         private final EmailService emailService;
+
+        @Value("${app.base-url}")
+        private String baseUrl;
 
         @Override
         public AuthResponse register(RegistrationRequest request) {
@@ -118,9 +122,10 @@ public class UserServiceImpl implements UserService {
                         user.setResetTokenExpiry(LocalDateTime.now().plusMinutes(15)); // Token valid for 15 minutes
                         userRepository.save(user);
 
-                        // Send email with reset token
+                        // Send email with reset URL
                         try {
-                                emailService.sendPasswordResetEmail(user.getEmail(), resetToken);
+                                emailService.sendPasswordResetEmail(user.getEmail(),
+                                                baseUrl + "/reset-password?token=" + resetToken);
                                 return true;
                         } catch (Exception e) {
                                 System.err.println("Failed to send password reset email to " + user.getEmail() + ": "
