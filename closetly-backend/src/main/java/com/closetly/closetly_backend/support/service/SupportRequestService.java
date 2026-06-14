@@ -4,13 +4,11 @@ import com.closetly.closetly_backend.support.dto.SupportRequestDTO;
 import com.closetly.closetly_backend.support.entity.SupportRequest;
 import com.closetly.closetly_backend.support.repository.SupportRequestRepository;
 import com.closetly.closetly_backend.support.status.SupportRequestStatus;
-import jakarta.mail.MessagingException;
+import com.closetly.closetly_backend.user.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -18,9 +16,9 @@ import org.springframework.stereotype.Service;
 public class SupportRequestService {
 
     private final SupportRequestRepository supportRequestRepository;
-    private final JavaMailSender javaMailSender;
+    private final EmailService emailService;
 
-    @Value("${support.admin.email:${spring.mail.username}}")
+    @Value("${support.admin.email:support@closetly.dev}")
     private String adminEmail;
 
     public SupportRequest saveSupportRequest(SupportRequestDTO request) {
@@ -51,17 +49,18 @@ public class SupportRequestService {
 
     public void sendEmailToAdmin(SupportRequest supportRequest) {
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setTo(adminEmail);
-            message.setSubject("New Support Request: " + supportRequest.getSubject());
-            message.setText("A new support request has been submitted.\n\n" +
-                    "Name: " + supportRequest.getName() + "\n" +
-                    "Email: " + supportRequest.getEmail() + "\n" +
-                    "Issue Type: " + safe(supportRequest.getIssueType()) + "\n" +
-                    "Subject: " + supportRequest.getSubject() + "\n\n" +
-                    "Message:\n" + supportRequest.getMessage() + "\n\n" +
-                    "Submitted at: " + supportRequest.getCreatedAt());
-            javaMailSender.send(message);
+            String subject = "New Support Request: " + supportRequest.getSubject();
+            String htmlBody = "<p>A new support request has been submitted.</p>" +
+                    "<p><strong>Name:</strong> " + escapeHtml(safe(supportRequest.getName())) + "</p>" +
+                    "<p><strong>Email:</strong> " + escapeHtml(safe(supportRequest.getEmail())) + "</p>" +
+                    "<p><strong>Issue Type:</strong> " + escapeHtml(safe(supportRequest.getIssueType())) + "</p>" +
+                    "<p><strong>Subject:</strong> " + escapeHtml(safe(supportRequest.getSubject())) + "</p>" +
+                    "<p><strong>Message:</strong></p>" +
+                    "<pre style=\"font-family:inherit;white-space:pre-wrap;\">"
+                    + escapeHtml(safe(supportRequest.getMessage())) + "</pre>" +
+                    "<p><strong>Submitted at:</strong> " + escapeHtml(String.valueOf(supportRequest.getCreatedAt()))
+                    + "</p>";
+            emailService.sendEmail(adminEmail, subject, htmlBody);
         } catch (Exception ex) {
             throw new RuntimeException("Unable to send support request email. Please try again later.", ex);
         }
@@ -69,5 +68,16 @@ public class SupportRequestService {
 
     private String safe(String value) {
         return value == null || value.isBlank() ? "Not specified" : value;
+    }
+
+    private static String escapeHtml(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        return raw.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#39;");
     }
 }

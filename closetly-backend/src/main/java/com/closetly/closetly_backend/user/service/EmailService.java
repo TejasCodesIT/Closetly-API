@@ -1,52 +1,83 @@
 package com.closetly.closetly_backend.user.service;
 
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
-import org.springframework.mail.MailAuthenticationException;
-import org.springframework.mail.MailSendException;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import jakarta.annotation.PostConstruct;
-
-import org.springframework.beans.factory.annotation.Value;
+import java.io.IOException;
 import java.time.LocalDate;
 
 @Service
-@RequiredArgsConstructor
 public class EmailService {
 
-    private final JavaMailSender mailSender;
+    private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
+    private final OkHttpClient httpClient = new OkHttpClient();
 
     @Value("${app.base-url}")
     private String baseUrl;
+
+    @Value("${resend.api.key}")
+    private String resendApiKey;
 
     @PostConstruct
     public void test() {
         System.out.println("BASE URL = " + baseUrl);
     }
 
-    public void sendPasswordResetEmail(String toEmail, String resetToken) {
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setTo(toEmail);
-            message.setSubject("Closetly Password Reset");
-            message.setText("Click the link below to reset your password:\n\n" + baseUrl +
-                    "/reset-password?token=" + resetToken + "\n\n" +
-                    "This link will expire in 15 minutes.\n\n" +
-                    "If you didn't request this password reset, please ignore this email.");
-
-            mailSender.send(message);
-        } catch (MailAuthenticationException e) {
-            System.err.println("Email authentication failed: " + e.getMessage());
-            throw new RuntimeException("Email authentication failed. Please check SMTP credentials.");
-        } catch (MailSendException e) {
-            System.err.println("Failed to send email: " + e.getMessage());
-            throw new RuntimeException("Failed to send email. Please try again later.");
-        } catch (Exception e) {
-            System.err.println("Unexpected error sending email: " + e.getMessage());
-            throw new RuntimeException("Unable to send email. Please try again later.");
+    public void sendEmail(String to, String subject, String htmlContent) {
+        if (to == null || to.isBlank()) {
+            throw new IllegalArgumentException("Recipient email address is required");
         }
+        if (resendApiKey == null || resendApiKey.isBlank()) {
+            throw new IllegalStateException("Resend API key is not configured");
+        }
+
+        String payload = "{" +
+                "\"from\":\"onboarding@resend.dev\"," +
+                "\"to\":[\"" + escapeJson(to) + "\"]," +
+                "\"subject\":\"" + escapeJson(subject) + "\"," +
+                "\"html\":\"" + escapeJson(htmlContent) + "\"" +
+                "}";
+
+        RequestBody body = RequestBody.create(payload, JSON);
+        Request request = new Request.Builder()
+                .url("https://api.resend.com/emails")
+                .header("Authorization", "Bearer " + resendApiKey)
+                .header("Content-Type", "application/json")
+                .post(body)
+                .build();
+
+        try (Response response = httpClient.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                String responseBody = response.body() != null ? response.body().string() : "";
+                throw new RuntimeException(
+                        "Resend API request failed with status " + response.code() + ": " + responseBody);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to send email through Resend API", e);
+        }
+    }
+
+    public void sendVerificationEmail(String email, String verificationUrl) {
+        String subject = "Verify your Closetly email";
+        String htmlBody = "<p>Verify your email by clicking the link below:</p>" +
+                "<p><a href=\"" + escapeHtml(verificationUrl) + "\">" + escapeHtml(verificationUrl) + "</a></p>";
+        sendEmail(email, subject, htmlBody);
+    }
+
+    public void sendPasswordResetEmail(String email, String resetUrl) {
+        String subject = "Closetly Password Reset";
+        String htmlBody = "<p>Click the link below to reset your password:</p>" +
+                "<p><a href=\"" + escapeHtml(resetUrl) + "\">" + escapeHtml(resetUrl) + "</a></p>" +
+                "<p>This link will expire in 15 minutes.</p>" +
+                "<p>If you didn't request this password reset, please ignore this email.</p>";
+        sendEmail(email, subject, htmlBody);
     }
 
     public void sendBookingCreatedEmail(
@@ -56,25 +87,13 @@ public class EmailService {
             LocalDate startDate,
             LocalDate endDate,
             String customerMessage) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(ownerEmail);
-        message.setSubject("New booking request: " + productTitle);
-        message.setText("""
-                You have received a new booking request.
-
-                Product: %s
-                Customer: %s
-                Dates: %s to %s
-
-                Message:
-                %s
-                """.formatted(
-                safe(productTitle),
-                safe(customerName),
-                safe(startDate),
-                safe(endDate),
-                safeMultiline(customerMessage)));
-        mailSender.send(message);
+        String subject = "New booking request: " + safe(productTitle);
+        String text = "You have received a new booking request." +
+                "\n\nProduct: " + safe(productTitle) +
+                "\nCustomer: " + safe(customerName) +
+                "\nDates: " + safe(startDate) + " to " + safe(endDate) +
+                "\n\nMessage:\n" + safeMultiline(customerMessage);
+        sendEmail(ownerEmail, subject, wrapHtml(text));
     }
 
     public void sendBookingApprovedEmail(
@@ -82,16 +101,11 @@ public class EmailService {
             String productTitle,
             LocalDate startDate,
             LocalDate endDate) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(customerEmail);
-        message.setSubject("Booking approved: " + productTitle);
-        message.setText("""
-                Your booking request has been approved.
-
-                Product: %s
-                Dates: %s to %s
-                """.formatted(safe(productTitle), safe(startDate), safe(endDate)));
-        mailSender.send(message);
+        String subject = "Booking approved: " + safe(productTitle);
+        String text = "Your booking request has been approved." +
+                "\n\nProduct: " + safe(productTitle) +
+                "\nDates: " + safe(startDate) + " to " + safe(endDate);
+        sendEmail(customerEmail, subject, wrapHtml(text));
     }
 
     public void sendBookingRejectedEmail(
@@ -99,16 +113,11 @@ public class EmailService {
             String productTitle,
             LocalDate startDate,
             LocalDate endDate) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(customerEmail);
-        message.setSubject("Booking rejected: " + productTitle);
-        message.setText("""
-                Your booking request has been rejected.
-
-                Product: %s
-                Dates: %s to %s
-                """.formatted(safe(productTitle), safe(startDate), safe(endDate)));
-        mailSender.send(message);
+        String subject = "Booking rejected: " + safe(productTitle);
+        String text = "Your booking request has been rejected." +
+                "\n\nProduct: " + safe(productTitle) +
+                "\nDates: " + safe(startDate) + " to " + safe(endDate);
+        sendEmail(customerEmail, subject, wrapHtml(text));
     }
 
     public void sendOrderCancelledByCustomerEmail(
@@ -117,22 +126,13 @@ public class EmailService {
             String customerName,
             String orderId,
             String reason) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(sellerEmail);
-        message.setSubject("Order cancelled by customer: " + productTitle);
-        message.setText("""
-                An order has been cancelled by the customer.
-
-                Order ID: %s
-                Product: %s
-                Customer: %s
-                Reason: %s
-                """.formatted(
-                safe(orderId),
-                safe(productTitle),
-                safe(customerName),
-                safe(reason)));
-        mailSender.send(message);
+        String subject = "Order cancelled by customer: " + safe(productTitle);
+        String text = "An order has been cancelled by the customer." +
+                "\n\nOrder ID: " + safe(orderId) +
+                "\nProduct: " + safe(productTitle) +
+                "\nCustomer: " + safe(customerName) +
+                "\nReason: " + safe(reason);
+        sendEmail(sellerEmail, subject, wrapHtml(text));
     }
 
     public void sendOrderCancelledBySellerEmail(
@@ -141,22 +141,13 @@ public class EmailService {
             String sellerName,
             String orderId,
             String reason) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(customerEmail);
-        message.setSubject("Order cancelled by seller: " + productTitle);
-        message.setText("""
-                Your order has been cancelled by the seller.
-
-                Order ID: %s
-                Product: %s
-                Seller: %s
-                Reason: %s
-                """.formatted(
-                safe(orderId),
-                safe(productTitle),
-                safe(sellerName),
-                safe(reason)));
-        mailSender.send(message);
+        String subject = "Order cancelled by seller: " + safe(productTitle);
+        String text = "Your order has been cancelled by the seller." +
+                "\n\nOrder ID: " + safe(orderId) +
+                "\nProduct: " + safe(productTitle) +
+                "\nSeller: " + safe(sellerName) +
+                "\nReason: " + safe(reason);
+        sendEmail(customerEmail, subject, wrapHtml(text));
     }
 
     public void sendBookingCancelledByCustomerEmail(
@@ -166,23 +157,13 @@ public class EmailService {
             LocalDate startDate,
             LocalDate endDate,
             String reason) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(ownerEmail);
-        message.setSubject("Booking cancelled by customer: " + productTitle);
-        message.setText("""
-                A booking has been cancelled by the customer.
-
-                Product: %s
-                Customer: %s
-                Dates: %s to %s
-                Reason: %s
-                """.formatted(
-                safe(productTitle),
-                safe(customerName),
-                safe(startDate),
-                safe(endDate),
-                safe(reason)));
-        mailSender.send(message);
+        String subject = "Booking cancelled by customer: " + safe(productTitle);
+        String text = "A booking has been cancelled by the customer." +
+                "\n\nProduct: " + safe(productTitle) +
+                "\nCustomer: " + safe(customerName) +
+                "\nDates: " + safe(startDate) + " to " + safe(endDate) +
+                "\nReason: " + safe(reason);
+        sendEmail(ownerEmail, subject, wrapHtml(text));
     }
 
     public void sendBookingCancelledBySellerEmail(
@@ -192,65 +173,50 @@ public class EmailService {
             LocalDate startDate,
             LocalDate endDate,
             String reason) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(customerEmail);
-        message.setSubject("Booking cancelled by seller: " + productTitle);
-        message.setText("""
-                Your booking has been cancelled by the seller.
-
-                Product: %s
-                Seller: %s
-                Dates: %s to %s
-                Reason: %s
-                """.formatted(
-                safe(productTitle),
-                safe(sellerName),
-                safe(startDate),
-                safe(endDate),
-                safe(reason)));
-        mailSender.send(message);
+        String subject = "Booking cancelled by seller: " + safe(productTitle);
+        String text = "Your booking has been cancelled by the seller." +
+                "\n\nProduct: " + safe(productTitle) +
+                "\nSeller: " + safe(sellerName) +
+                "\nDates: " + safe(startDate) + " to " + safe(endDate) +
+                "\nReason: " + safe(reason);
+        sendEmail(customerEmail, subject, wrapHtml(text));
     }
-
-    // public void sendEmailVerificationEmail(String toEmail, String
-    // verificationToken) {
-    // SimpleMailMessage message = new SimpleMailMessage();
-    // message.setTo(toEmail);
-    // message.setSubject("Verify your Closetly email");
-    // message.setText("Verify your email by clicking this link:\n\n" +
-    // "http://localhost:8080/auth/verify?token=" + verificationToken + "\n\n" +
-    // "If you didn't create this account, you can ignore this email.");
-    // mailSender.send(message);
-    // }
 
     public void sendEmailVerificationEmail(String toEmail, String verificationToken) {
-
-    try {
-
-        String verificationUrl =
-                baseUrl + "/api/auth/verify?token=" + verificationToken;
-
-        System.out.println("EMAIL TO = " + toEmail);
-        System.out.println("VERIFICATION URL = " + verificationUrl);
-
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(toEmail);
-        message.setSubject("Verify your Closetly email");
-        message.setText(
-                "Verify your email by clicking this link:\n\n"
-                        + verificationUrl);
-
-        mailSender.send(message);
-
-        System.out.println("EMAIL SENT SUCCESSFULLY");
-
-    } catch (Exception e) {
-
-        System.out.println("EMAIL ERROR:");
-        e.printStackTrace();
-
-        throw e;
+        try {
+            String verificationUrl = baseUrl + "/api/auth/verify?token=" + verificationToken;
+            sendVerificationEmail(toEmail, verificationUrl);
+        } catch (Exception e) {
+            System.err.println("EMAIL ERROR: " + e.getMessage());
+            throw new RuntimeException("Unable to send email. Please try again later.", e);
+        }
     }
-}
+
+    private static String wrapHtml(String text) {
+        return "<html><body><pre style=\"font-family:inherit;white-space:pre-wrap;\">" + escapeHtml(text)
+                + "</pre></body></html>";
+    }
+
+    private static String escapeJson(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        return raw.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r");
+    }
+
+    private static String escapeHtml(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        return raw.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#39;");
+    }
 
     private static String safe(Object val) {
         return val == null ? "-" : val.toString();
