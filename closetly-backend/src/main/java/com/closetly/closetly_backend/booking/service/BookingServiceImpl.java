@@ -277,12 +277,13 @@ public class BookingServiceImpl implements BookingService {
         }
     }
 
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(BookingServiceImpl.class);
+
     private static void safeSend(Runnable action) {
         try {
             action.run();
         } catch (Exception e) {
-            // Don't block booking state changes if notifications fail
-            System.err.println("Notification/email failed: " + e.getMessage());
+            logger.warn("Notification/email failed: {}", e.getMessage(), e);
         }
     }
 }

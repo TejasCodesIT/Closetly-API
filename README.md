@@ -8,6 +8,53 @@ To make it easy for you to get started with GitLab, here's a list of recommended
 
 Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
 
+## Running the backend
+
+This project uses Spring Boot profiles to separate local, dev, and prod configuration.
+
+### Default profile
+
+- `application.properties` sets `spring.profiles.active=local`
+- This means running the app without extra options will use the local profile.
+
+### Supported profiles
+
+- `local` - local development with MySQL, SQL logging, and `http://localhost:4200` CORS.
+- `dev` - development environment using `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, and `APP_CORS_ALLOWED_ORIGINS`.
+- `prod` - production environment using the same database env vars and tighter logging/pool settings.
+
+### Run commands
+
+From `closetly-backend`:
+
+- Local profile:
+  - `./mvnw spring-boot:run`
+- Dev profile:
+  - `SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run`
+- Prod profile:
+  - `SPRING_PROFILES_ACTIVE=prod ./mvnw spring-boot:run`
+
+### Required environment variables
+
+Base config (all profiles):
+
+- `JWT_SECRET`
+- `APP_BASE_URL`
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_API_KEY`
+- `CLOUDINARY_API_SECRET`
+- `OPENCAGE_API_KEY`
+- `RESEND_API_KEY`
+
+Dev / Prod only:
+
+- `DB_URL`
+- `DB_USERNAME`
+- `DB_PASSWORD`
+- `APP_CORS_ALLOWED_ORIGINS`
+
+> Note: `local` profile stores database settings in `application-local.properties` and does not require these env vars for local MySQL use.
+
 ## Add your files
 
 * [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files

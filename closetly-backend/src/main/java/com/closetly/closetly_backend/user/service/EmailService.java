@@ -1,12 +1,13 @@
 package com.closetly.closetly_backend.user.service;
 
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -16,6 +17,7 @@ import java.time.LocalDate;
 @Service
 public class EmailService {
 
+    private static final Logger logger = LoggerFactory.getLogger(EmailService.class);
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
     private final OkHttpClient httpClient = new OkHttpClient();
 
@@ -24,11 +26,6 @@ public class EmailService {
 
     @Value("${resend.api.key}")
     private String resendApiKey;
-
-    @PostConstruct
-    public void test() {
-        System.out.println("BASE URL = " + baseUrl);
-    }
 
     public void sendEmail(String to, String subject, String htmlContent) {
         if (to == null || to.isBlank()) {
@@ -56,10 +53,12 @@ public class EmailService {
         try (Response response = httpClient.newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 String responseBody = response.body() != null ? response.body().string() : "";
+                logger.error("Resend API request failed with status {}: {}", response.code(), responseBody);
                 throw new RuntimeException(
                         "Resend API request failed with status " + response.code() + ": " + responseBody);
             }
         } catch (IOException e) {
+            logger.error("Failed to send email through Resend API", e);
             throw new RuntimeException("Failed to send email through Resend API", e);
         }
     }
@@ -187,7 +186,7 @@ public class EmailService {
             String verificationUrl = baseUrl + "/api/auth/verify?token=" + verificationToken;
             sendVerificationEmail(toEmail, verificationUrl);
         } catch (Exception e) {
-            System.err.println("EMAIL ERROR: " + e.getMessage());
+            logger.error("EMAIL ERROR while sending verification email", e);
             throw new RuntimeException("Unable to send email. Please try again later.", e);
         }
     }

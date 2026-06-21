@@ -20,9 +20,11 @@ import com.closetly.closetly_backend.cart.entity.CartItem;
 import com.closetly.closetly_backend.cart.repository.CartItemRepository;
 import com.closetly.closetly_backend.cart.entity.CartItem.CartItemType;
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -112,7 +114,7 @@ public class OrderServiceImpl implements OrderService {
         validateAndSetOrderStatus(order);
 
         Order saved = orderRepository.save(order);
-    
+
         return toLegacyDto(saved);
     }
 
@@ -239,7 +241,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         Order saved = orderRepository.save(order);
-       
+
         return toDto(saved);
     }
 
@@ -259,8 +261,8 @@ public class OrderServiceImpl implements OrderService {
             throw new IllegalStateException("Cart is empty. Add items to cart before placing order.");
         }
 
+        // no-op placeholder to keep the stream semantics explicit
         cartItems.forEach(item -> {
-           
         });
 
         // 4. Group cart items by seller
@@ -283,7 +285,6 @@ public class OrderServiceImpl implements OrderService {
         List<Order> orders = new ArrayList<>();
 
         for (Map.Entry<Long, List<CartItem>> entry : itemsBySeller.entrySet()) {
-            Long sellerId = entry.getKey();
             List<CartItem> sellerCartItems = entry.getValue();
 
             // Get seller
@@ -398,7 +399,7 @@ public class OrderServiceImpl implements OrderService {
 
             // Save the order (cascade will save order items)
             Order savedOrder = orderRepository.save(order);
-           
+
             orders.add(savedOrder);
         }
 
@@ -761,8 +762,21 @@ public class OrderServiceImpl implements OrderService {
         order.setStatus(OrderStatus.CANCELLED);
         Order saved = orderRepository.save(order);
 
-        // TODO: Send notification to customer
-        // TODO: Restore product quantities for BUY items
+        // If a product buy order is cancelled, restore stock and availability
+        for (OrderItem item : order.getOrderItems()) {
+            if (item.getType() == OrderItemType.BUY) {
+                if (item.getProductVariant() != null) {
+                    item.getProductVariant().increaseQuantity(item.getQuantity());
+                } else {
+                    Product product = item.getProduct();
+                    Integer currentQty = product.getQuantity();
+                    if (currentQty != null) {
+                        product.setQuantity(currentQty + item.getQuantity());
+                    }
+                }
+                item.getProduct().setForSale(true);
+            }
+        }
 
         return toDto(saved);
     }
@@ -859,8 +873,12 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public Page<OrderDTO> getSellerOrders(String email, int page, int size) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'getSellerOrders'");
+        User seller = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Seller not found"));
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Order> ordersPage = orderRepository.findBySellerIdOrderByCreatedAtDesc(seller.getId(), pageable);
+        return ordersPage.map(this::toDto);
     }
 
     @Override
