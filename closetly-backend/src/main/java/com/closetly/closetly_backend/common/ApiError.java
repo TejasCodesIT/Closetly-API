@@ -1,18 +1,18 @@
 package com.closetly.closetly_backend.common;
 
 import java.time.LocalDateTime;
-import java.util.Map;
+import java.util.List;
 
 public class ApiError {
     private int status;
     private String message;
-    private Map<String, String> errors;
+    private List<String> errors;
     private LocalDateTime timestamp;
 
     public ApiError() {
     }
 
-    public ApiError(int status, String message, Map<String, String> errors, LocalDateTime timestamp) {
+    public ApiError(int status, String message, List<String> errors, LocalDateTime timestamp) {
         this.status = status;
         this.message = message;
         this.errors = errors;
@@ -35,11 +35,11 @@ public class ApiError {
         this.message = message;
     }
 
-    public Map<String, String> getErrors() {
+    public List<String> getErrors() {
         return errors;
     }
 
-    public void setErrors(Map<String, String> errors) {
+    public void setErrors(List<String> errors) {
         this.errors = errors;
     }
 

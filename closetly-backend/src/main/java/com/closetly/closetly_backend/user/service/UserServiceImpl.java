@@ -1,5 +1,7 @@
 package com.closetly.closetly_backend.user.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import com.closetly.closetly_backend.user.dto.AuthResponse;
 import com.closetly.closetly_backend.user.dto.LoginRequest;
@@ -29,6 +31,8 @@ import java.time.LocalDateTime;
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
+
+        private static final Logger logger = LoggerFactory.getLogger(UserServiceImpl.class);
 
         private final UserRepository userRepository;
         private final PasswordEncoder passwordEncoder;
@@ -64,14 +68,12 @@ public class UserServiceImpl implements UserService {
                                 .build();
                 user = Objects.requireNonNull(userRepository.save(user));
 
-                // emailService.sendEmailVerificationEmail(user.getEmail(), verificationToken);
                 try {
                         emailService.sendEmailVerificationEmail(user.getEmail(), verificationToken);
                 } catch (Exception e) {
-                        e.printStackTrace();
+                        logger.error("Failed to send verification email to {}", user.getEmail(), e);
                 }
                 AuthResponse resp = new AuthResponse();
-                // refresh token generation could be added later
                 return resp;
         }
 
@@ -116,21 +118,18 @@ public class UserServiceImpl implements UserService {
                 if (userOptional.isPresent()) {
                         User user = userOptional.get();
 
-                        // Generate reset token
                         String resetToken = UUID.randomUUID().toString();
                         user.setResetToken(resetToken);
-                        user.setResetTokenExpiry(LocalDateTime.now().plusMinutes(15)); // Token valid for 15 minutes
+                        user.setResetTokenExpiry(LocalDateTime.now().plusMinutes(15));
                         userRepository.save(user);
 
-                        // Send email with reset URL
                         try {
                                 emailService.sendPasswordResetEmail(user.getEmail(),
                                                 baseUrl + "/reset-password?token=" + resetToken);
                                 return true;
                         } catch (Exception e) {
-                                System.err.println("Failed to send password reset email to " + user.getEmail() + ": "
-                                                + e.getMessage());
-                                throw new RuntimeException("Unable to send email. Please try later.");
+                                logger.error("Failed to send password reset email to {}", user.getEmail(), e);
+                                throw new RuntimeException("Unable to send email. Please try later.", e);
                         }
                 }
                 return false;
